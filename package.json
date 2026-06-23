@@ -1,0 +1,30 @@
+{
+  "name": "@three-ws/x402-server",
+  "version": "0.1.0",
+  "description": "The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee.",
+  "keywords": [
+    "x402",
+    "402",
+    "payment-required",
+    "paywall",
+    "usdc",
+    "solana",
+    "base",
+    "eip-3009",
+    "merchant",
+    "middleware",
+    "agent-payments",
+    "three.ws"
+  ],
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "homepage": "https://three.ws",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nirholas/three.ws"
+  },
+  "bugs": {
+    "url": "https://github.com/nirholas/three.ws/issues"
+  }
+}
