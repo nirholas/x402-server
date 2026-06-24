@@ -187,6 +187,17 @@ function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSecond
 	// payTo (Solana leads).
 	const requested = network ? (Array.isArray(network) ? network : [network]) : LANES.filter((l) => payTo[l]);
 	const lanes = [...new Set(requested)];
+
+	// Validate the optional flat $THREE amount once, up front. Omit → reuse the
+	// USDC `price`.
+	let threeAmt = null;
+	if (acceptThree) {
+		threeAmt = threeAmount === undefined || threeAmount === null || String(threeAmount) === '' ? amount : String(threeAmount);
+		if (!/^\d+$/.test(threeAmt)) {
+			throw new ThreeWsError(`threeAmount must be a whole atomic amount string, got "${threeAmt}".`, { code: 'invalid_input' });
+		}
+	}
+
 	const out = [];
 	for (const lane of lanes) {
 		if (!LANES.includes(lane)) {
@@ -197,16 +208,12 @@ function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSecond
 			throw new ThreeWsError(`network includes "${lane}" but payTo.${lane} is not set.`, { code: 'invalid_input' });
 		}
 		out.push(buildAccept({ lane, amount, asset, payTo: to, feePayer, maxTimeoutSeconds, resourceUrl }));
-	}
-	// $THREE alongside USDC on Solana — the platform's second main asset. Pushed
-	// AFTER the USDC entry so first-accept clients keep settling USDC; a wallet
-	// that renders a token chooser surfaces both. Mirrors paymentRequirements().
-	if (acceptThree && lanes.includes('solana') && payTo.solana) {
-		const threeAmt = threeAmount === undefined || threeAmount === null || String(threeAmount) === '' ? amount : String(threeAmount);
-		if (!/^\d+$/.test(threeAmt)) {
-			throw new ThreeWsError(`threeAmount must be a whole atomic amount string, got "${threeAmt}".`, { code: 'invalid_input' });
+		// $THREE rides immediately after the USDC Solana accept — the platform's
+		// two main assets, Solana-first — so a wallet's token chooser surfaces both
+		// while a first-accept client still settles USDC. Mirrors paymentRequirements().
+		if (lane === 'solana' && acceptThree) {
+			out.push(buildAccept({ lane: 'solana', amount: threeAmt, asset: 'three', payTo: to, feePayer, maxTimeoutSeconds, resourceUrl }));
 		}
-		out.push(buildAccept({ lane: 'solana', amount: threeAmt, asset: 'three', payTo: payTo.solana, feePayer, maxTimeoutSeconds, resourceUrl }));
 	}
 	if (!out.length) {
 		throw new ThreeWsError('No payable lanes — set payTo for solana and/or base.', { code: 'invalid_input' });

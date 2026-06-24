@@ -88,6 +88,59 @@ test('buildChallenge() advertises only the requested lane', () => {
 	assert.equal(challenge.accepts[0].network, NETWORK_BASE_MAINNET);
 });
 
+const THREE_MINT = 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump';
+
+test('acceptThree adds a $THREE Solana accept after USDC (both main assets)', () => {
+	const challenge = buildChallenge({
+		price: '10000',
+		payTo: { solana: SYNTH_SOLANA_PAYTO, base: SYNTH_BASE_PAYTO },
+		feePayer: SYNTH_SOLANA_FEEPAYER,
+		acceptThree: true,
+		threeAmount: '10000000',
+	});
+	// USDC-Solana, $THREE-Solana, then Base — $THREE rides after USDC so a
+	// first-accept client still settles USDC.
+	assert.equal(challenge.accepts.length, 3);
+	const three = challenge.accepts[1];
+	assert.equal(three.network, NETWORK_SOLANA_MAINNET);
+	assert.equal(three.asset, THREE_MINT);
+	assert.equal(three.amount, '10000000');
+	assert.equal(three.extra.name, 'THREE');
+	assert.equal(three.extra.decimals, 6);
+	assert.equal(three.extra.feePayer, SYNTH_SOLANA_FEEPAYER);
+});
+
+test('acceptThree reuses the USDC price when threeAmount is omitted', () => {
+	const challenge = buildChallenge({
+		price: '50000',
+		payTo: { solana: SYNTH_SOLANA_PAYTO },
+		feePayer: SYNTH_SOLANA_FEEPAYER,
+		acceptThree: true,
+	});
+	assert.equal(challenge.accepts.length, 2);
+	assert.equal(challenge.accepts[1].asset, THREE_MINT);
+	assert.equal(challenge.accepts[1].amount, '50000');
+});
+
+test("asset: 'three' pins the $THREE mint on Solana", () => {
+	const challenge = buildChallenge({
+		price: '10000000',
+		asset: 'three',
+		payTo: { solana: SYNTH_SOLANA_PAYTO },
+		feePayer: SYNTH_SOLANA_FEEPAYER,
+	});
+	assert.equal(challenge.accepts.length, 1);
+	assert.equal(challenge.accepts[0].asset, THREE_MINT);
+	assert.equal(challenge.accepts[0].extra.name, 'THREE');
+});
+
+test("asset: 'three' on an EVM lane is rejected (Solana-only)", () => {
+	assert.throws(
+		() => buildChallenge({ price: '10000', asset: 'three', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] }),
+		(err) => err instanceof ThreeWsError && err.code === 'invalid_input',
+	);
+});
+
 test('a Solana accept without a feePayer is rejected with missing_fee_payer', () => {
 	assert.throws(
 		() => buildChallenge({ price: '1000', payTo: { solana: SYNTH_SOLANA_PAYTO } }),

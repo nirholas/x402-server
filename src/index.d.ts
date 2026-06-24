@@ -58,8 +58,11 @@ export interface PayTo {
 	'base-sepolia'?: string;
 }
 
-/** Settlement asset: `'usdc'` resolves canonical USDC, or pin addresses per lane. */
-export type Asset = 'usdc' | { solana?: string; base?: string };
+/**
+ * Settlement asset. `'usdc'` resolves canonical USDC per lane; `'three'` resolves
+ * the $THREE platform token (Solana-only); or pin explicit addresses per lane.
+ */
+export type Asset = 'usdc' | 'three' | { solana?: string; base?: string };
 
 export interface BuildChallengeOptions {
 	/** Amount in atomic units of the asset (`'10000'` = $0.01 of 6-decimal USDC). */
@@ -70,6 +73,16 @@ export interface BuildChallengeOptions {
 	network?: Lane | Lane[];
 	/** The Solana facilitator sponsor account (required for a Solana accept). */
 	feePayer?: string;
+	/**
+	 * Advertise $THREE alongside USDC on the Solana lane (a second accept, pushed
+	 * after USDC). The platform's two main x402 assets in one challenge.
+	 */
+	acceptThree?: boolean;
+	/**
+	 * Atomic $THREE amount (6 decimals) for the `acceptThree` entry. Omit to reuse
+	 * the USDC `price` value.
+	 */
+	threeAmount?: string | number;
 	/** Platform fee in basis points, split OUT of price (≤ 1000 / 10%). */
 	feeBps?: number;
 	/** Fee recipient. Required when feeBps > 0. */
