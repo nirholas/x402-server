@@ -47,6 +47,15 @@ const CANONICAL_USDC = {
 	base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
 };
 
+// $THREE — the three.ws platform token, the second main x402 settlement asset
+// alongside USDC. Solana-only (it's an SPL mint). `asset: 'three'` resolves to
+// it; `acceptThree: true` advertises it next to USDC on the Solana lane, exactly
+// as api/_lib/x402-spec.js does server-side. 6 decimals.
+const CANONICAL_THREE = {
+	solana: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
+};
+const THREE_DECIMALS = 6;
+
 // Maps the ergonomic lane name → CAIP-2 network id. Solana leads when both are
 // present, matching paymentRequirements()'s Solana-first ordering.
 const LANE_NETWORK = {
@@ -162,7 +171,7 @@ export function paid(opts, handler) {
 // order. Each entry carries scheme/network/amount/asset/payTo/maxTimeoutSeconds
 // + the per-lane `extra` block (Solana needs a feePayer; Base pins the EIP-712
 // domain name "USD Coin"). Grounded in paymentRequirements().
-function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSeconds, resourceUrl }) {
+function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSeconds, resourceUrl, acceptThree, threeAmount }) {
 	if (price === undefined || price === null || String(price) === '') {
 		throw new ThreeWsError('buildChallenge() needs a `price` in atomic units.', { code: 'invalid_input' });
 	}
@@ -189,6 +198,16 @@ function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSecond
 		}
 		out.push(buildAccept({ lane, amount, asset, payTo: to, feePayer, maxTimeoutSeconds, resourceUrl }));
 	}
+	// $THREE alongside USDC on Solana — the platform's second main asset. Pushed
+	// AFTER the USDC entry so first-accept clients keep settling USDC; a wallet
+	// that renders a token chooser surfaces both. Mirrors paymentRequirements().
+	if (acceptThree && lanes.includes('solana') && payTo.solana) {
+		const threeAmt = threeAmount === undefined || threeAmount === null || String(threeAmount) === '' ? amount : String(threeAmount);
+		if (!/^\d+$/.test(threeAmt)) {
+			throw new ThreeWsError(`threeAmount must be a whole atomic amount string, got "${threeAmt}".`, { code: 'invalid_input' });
+		}
+		out.push(buildAccept({ lane: 'solana', amount: threeAmt, asset: 'three', payTo: payTo.solana, feePayer, maxTimeoutSeconds, resourceUrl }));
+	}
 	if (!out.length) {
 		throw new ThreeWsError('No payable lanes — set payTo for solana and/or base.', { code: 'invalid_input' });
 	}
@@ -213,7 +232,12 @@ function buildAccept({ lane, amount, asset, payTo, feePayer, maxTimeoutSeconds, 
 		if (!feePayer) {
 			throw new ThreeWsError('Solana accepts need a `feePayer` (the facilitator sponsor account) — set X402_FEE_PAYER_SOLANA.', { code: 'missing_fee_payer' });
 		}
-		accept.extra = { name: 'USDC', decimals: 6, feePayer };
+		// `extra` names the settlement token — $THREE when this is a THREE accept,
+		// USDC otherwise — so a wallet labels the choice correctly.
+		const isThree = asset === 'three' || assetAddress === CANONICAL_THREE.solana;
+		accept.extra = isThree
+			? { name: 'THREE', decimals: THREE_DECIMALS, feePayer }
+			: { name: 'USDC', decimals: 6, feePayer };
 	} else {
 		// `name` MUST match the on-chain EIP-712 domain. Base USDC's domain name
 		// is "USD Coin" (not "USDC") — using "USDC" recomputes the wrong domain
@@ -224,6 +248,14 @@ function buildAccept({ lane, amount, asset, payTo, feePayer, maxTimeoutSeconds, 
 }
 
 function resolveAsset(asset, lane) {
+	if (asset === 'three') {
+		// $THREE is an SPL mint — Solana only. Advertising it on an EVM lane is a
+		// misconfiguration, not a silent USDC fallback.
+		if (lane !== 'solana') {
+			throw new ThreeWsError(`$THREE settlement is Solana-only — lane "${lane}" can't advertise THREE.`, { code: 'invalid_input' });
+		}
+		return CANONICAL_THREE.solana;
+	}
 	if (!asset || asset === 'usdc') return CANONICAL_USDC[lane === 'base-sepolia' ? 'base' : lane];
 	if (typeof asset === 'string') return asset;
 	if (typeof asset === 'object') {
@@ -243,6 +275,8 @@ function buildChallengeEnvelope({
 	feeBps,
 	feeTo,
 	feePayer,
+	acceptThree,
+	threeAmount,
 	accepts,
 	maxTimeoutSeconds,
 	resourceUrl,
@@ -256,7 +290,7 @@ function buildChallengeEnvelope({
 } = {}) {
 	const list = Array.isArray(accepts) && accepts.length
 		? accepts
-		: buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSeconds, resourceUrl });
+		: buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSeconds, resourceUrl, acceptThree, threeAmount });
 
 	const resource = { url: resourceUrl ?? null, mimeType };
 	if (typeof description === 'string' && description.length) resource.description = description;
