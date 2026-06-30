@@ -1,15 +1,17 @@
-// Zero-dependency HTTP core shared across the @three-ws/* SDK family.
-// Copied verbatim into each package so every SDK stays dependency-free while
-// resolving the base URL, attaching auth, and mapping the platform's JSON error
-// envelope onto typed errors the same way everywhere.
+// Zero-dependency HTTP core for the x402-server SDK. It resolves the facilitator
+// base URL, attaches optional auth, and maps a JSON error envelope onto typed
+// errors. No runtime dependencies — runs on Node 18+, Bun, Deno, and Workers.
 
-export const DEFAULT_BASE_URL = 'https://three.ws';
+// No baked-in host. The seller always points the SDK at its own facilitator,
+// supplied as an explicit `baseUrl` option or via the X402_FACILITATOR_URL env
+// var; the default is an empty string.
+export const DEFAULT_BASE_URL = '';
 
-/** Base error for every @three-ws/* SDK. Carries a stable `code` + HTTP `status`. */
-export class ThreeWsError extends Error {
+/** Base error for the x402-server SDK. Carries a stable `code` + HTTP `status`. */
+export class X402Error extends Error {
 	constructor(message, { code = 'error', status = null, detail = null, retryAfter = null, body = null } = {}) {
 		super(message);
-		this.name = 'ThreeWsError';
+		this.name = 'X402Error';
 		this.code = code;
 		this.status = status;
 		if (detail) this.detail = detail;
@@ -21,10 +23,10 @@ export class ThreeWsError extends Error {
 /**
  * Thrown on HTTP 402. The endpoint wants payment before it will do the work.
  * `accepts` is the x402 challenge (asset/amount/network/payTo) when present —
- * pass a payment-aware `fetch` (e.g. @three-ws/x402-fetch) to settle it
- * automatically, or read `accepts` and pay it yourself.
+ * pass a payment-aware `fetch` to settle it automatically, or read `accepts`
+ * and pay it yourself.
  */
-export class PaymentRequiredError extends ThreeWsError {
+export class PaymentRequiredError extends X402Error {
 	constructor(message, opts = {}) {
 		super(message, { ...opts, code: opts.code || 'payment_required', status: opts.status ?? 402 });
 		this.name = 'PaymentRequiredError';
@@ -32,9 +34,9 @@ export class PaymentRequiredError extends ThreeWsError {
 	}
 }
 
-/** Resolve the API origin: explicit option → THREE_WS_BASE_URL env → default. */
+/** Resolve the facilitator origin: explicit option → X402_FACILITATOR_URL env → empty. */
 export function resolveBaseUrl(baseUrl) {
-	const env = typeof process !== 'undefined' && process.env ? process.env.THREE_WS_BASE_URL : null;
+	const env = typeof process !== 'undefined' && process.env ? process.env.X402_FACILITATOR_URL : null;
 	return String(baseUrl || env || DEFAULT_BASE_URL).replace(/\/+$/, '');
 }
 
@@ -54,7 +56,7 @@ function buildUrl(baseUrl, path, query) {
  * Returns parsed JSON on success; throws a typed error on any non-2xx.
  *
  * @param {object} [opts]
- * @param {string} [opts.baseUrl]  API origin (default https://three.ws).
+ * @param {string} [opts.baseUrl]  facilitator origin (default: X402_FACILITATOR_URL env, else empty).
  * @param {typeof fetch} [opts.fetch]  fetch implementation (default globalThis.fetch).
  * @param {string} [opts.apiKey]  bearer token attached as Authorization.
  * @param {Record<string,string>} [opts.headers]  default headers on every call.
@@ -63,7 +65,7 @@ export function createHttp(opts = {}) {
 	const baseUrl = resolveBaseUrl(opts.baseUrl);
 	const fetchImpl = opts.fetch || (typeof globalThis !== 'undefined' ? globalThis.fetch : undefined);
 	if (typeof fetchImpl !== 'function') {
-		throw new ThreeWsError('No fetch implementation available — run on Node 18+ or pass { fetch }.', { code: 'no_fetch' });
+		throw new X402Error('No fetch implementation available — run on Node 18+ or pass { fetch }.', { code: 'no_fetch' });
 	}
 	const baseHeaders = { accept: 'application/json', ...(opts.headers || {}) };
 	if (opts.apiKey) baseHeaders.authorization = `Bearer ${opts.apiKey}`;
@@ -81,7 +83,7 @@ export function createHttp(opts = {}) {
 			res = await fetchImpl(url, init);
 		} catch (err) {
 			if (err?.name === 'AbortError') throw err;
-			throw new ThreeWsError(`Network request to ${url.pathname} failed: ${err?.message || err}`, { code: 'network_error' });
+			throw new X402Error(`Network request to ${url.pathname} failed: ${err?.message || err}`, { code: 'network_error' });
 		}
 
 		const text = await res.text();
@@ -99,7 +101,7 @@ export function createHttp(opts = {}) {
 		if (res.status === 402) {
 			throw new PaymentRequiredError(message, { code, status: 402, accepts: payload?.accepts ?? null, detail: payload?.detail, body: payload });
 		}
-		throw new ThreeWsError(message, { code, status: res.status, detail: payload?.detail, retryAfter, body: payload });
+		throw new X402Error(message, { code, status: res.status, detail: payload?.detail, retryAfter, body: payload });
 	};
 }
 

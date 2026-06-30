@@ -5,15 +5,14 @@ import {
 	buildChallenge,
 	feeSplit,
 	fetchAdapter,
-	ThreeWsError,
+	X402Error,
 	NETWORK_SOLANA_MAINNET,
 	NETWORK_BASE_MAINNET,
 } from '../src/index.js';
 
 // A scripted fetch double: each call shifts the next queued response and records
 // the request. No network, no real facilitator — we assert on request shaping
-// and response parsing, which is all the SDK is responsible for. (Copied
-// verbatim from @three-ws/forge's test harness.)
+// and response parsing, which is all the SDK is responsible for.
 function stubFetch(responses) {
 	const calls = [];
 	const queue = [...responses];
@@ -37,6 +36,9 @@ const SYNTH_SOLANA_PAYTO = 'THREEsynthetic1111111111111111111111111PayTo';
 const SYNTH_SOLANA_FEEPAYER = 'THREEsynthetic1111111111111111111111FeePayer';
 const SYNTH_BASE_PAYTO = '0x00000000000000000000000000000000DeaDBeef';
 const SYNTH_TREASURY = 'TREASURYsynthetic111111111111111111111Treasury';
+// The seller always supplies its own facilitator; we stub fetch so no real
+// request leaves the process.
+const FACILITATOR = 'https://facilitator.example.com';
 
 function xPaymentHeader(payload) {
 	return Buffer.from(JSON.stringify(payload)).toString('base64');
@@ -48,17 +50,17 @@ test('buildChallenge() emits the exact v2 accepts[] envelope', () => {
 		asset: 'usdc',
 		payTo: { solana: SYNTH_SOLANA_PAYTO, base: SYNTH_BASE_PAYTO },
 		feePayer: SYNTH_SOLANA_FEEPAYER,
-		resourceUrl: 'https://three.ws/api/thing',
+		resourceUrl: 'https://example.com/api/thing',
 		description: 'Doc summarize',
 	});
 
 	assert.equal(challenge.x402Version, 2);
 	assert.equal(challenge.error, 'X-PAYMENT header is required');
-	assert.equal(challenge.resource.url, 'https://three.ws/api/thing');
+	assert.equal(challenge.resource.url, 'https://example.com/api/thing');
 	assert.equal(challenge.resource.description, 'Doc summarize');
 	assert.equal(challenge.accepts.length, 2);
 
-	// Solana leads (platform Solana-first ordering) and carries the fee payer.
+	// Solana leads (Solana-first ordering) and carries the fee payer.
 	const sol = challenge.accepts[0];
 	assert.equal(sol.scheme, 'exact');
 	assert.equal(sol.network, NETWORK_SOLANA_MAINNET);
@@ -137,7 +139,7 @@ test("asset: 'three' pins the $THREE mint on Solana", () => {
 test("asset: 'three' on an EVM lane is rejected (Solana-only)", () => {
 	assert.throws(
 		() => buildChallenge({ price: '10000', asset: 'three', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] }),
-		(err) => err instanceof ThreeWsError && err.code === 'invalid_input',
+		(err) => err instanceof X402Error && err.code === 'invalid_input',
 	);
 });
 
@@ -145,7 +147,7 @@ test('a Solana accept without a feePayer is rejected with missing_fee_payer', ()
 	assert.throws(
 		() => buildChallenge({ price: '1000', payTo: { solana: SYNTH_SOLANA_PAYTO } }),
 		(e) => {
-			assert.ok(e instanceof ThreeWsError);
+			assert.ok(e instanceof X402Error);
 			assert.equal(e.code, 'missing_fee_payer');
 			return true;
 		},
@@ -162,7 +164,7 @@ test('verifyPayment() POSTs the v2 verify body and shapes a valid result', async
 	const { fetch, calls } = stubFetch([
 		{ body: { isValid: true, payer: SYNTH_SOLANA_PAYTO, network: NETWORK_SOLANA_MAINNET } },
 	]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const accepts = buildChallenge({
 		price: '50000',
 		payTo: { solana: SYNTH_SOLANA_PAYTO },
@@ -186,7 +188,7 @@ test('verifyPayment() POSTs the v2 verify body and shapes a valid result', async
 
 test('verifyPayment() accepts the positional (header, expected) shape', async () => {
 	const { fetch } = stubFetch([{ body: { isValid: true, payer: SYNTH_BASE_PAYTO } }]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const challenge = buildChallenge({ price: '1000', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] });
 	const header = xPaymentHeader({ network: NETWORK_BASE_MAINNET, payload: { authorization: { value: '1000' } } });
 	const verified = await server.verifyPayment(header, challenge);
@@ -195,7 +197,7 @@ test('verifyPayment() accepts the positional (header, expected) shape', async ()
 
 test('a facilitator-rejected payment returns a fresh 402 body, not a throw', async () => {
 	const { fetch } = stubFetch([{ body: { isValid: false, invalidReason: 'underpaid' } }]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const accepts = buildChallenge({ price: '50000', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] }).accepts;
 	const header = xPaymentHeader({ network: NETWORK_BASE_MAINNET, payload: { authorization: { value: '10' } } });
 	const res = await server.verifyPayment({ paymentHeader: header, requirements: accepts });
@@ -208,11 +210,11 @@ test('a facilitator-rejected payment returns a fresh 402 body, not a throw', asy
 
 test('a facilitator outage on /verify is a typed 502, never a rejected payment', async () => {
 	const { fetch } = stubFetch([{ status: 502, body: { error: 'bad_gateway' } }]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const accepts = buildChallenge({ price: '1000', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] }).accepts;
 	const header = xPaymentHeader({ network: NETWORK_BASE_MAINNET, payload: { authorization: { value: '1000' } } });
 	await assert.rejects(() => server.verifyPayment({ paymentHeader: header, requirements: accepts }), (e) => {
-		assert.ok(e instanceof ThreeWsError);
+		assert.ok(e instanceof X402Error);
 		assert.equal(e.status, 502);
 		return true;
 	});
@@ -223,7 +225,7 @@ test('settlePayment() POSTs /settle and shapes the receipt', async () => {
 		{ body: { isValid: true, payer: SYNTH_SOLANA_PAYTO } },
 		{ body: { success: true, transaction: 'TXSIG123', network: NETWORK_SOLANA_MAINNET, payer: SYNTH_SOLANA_PAYTO } },
 	]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const accepts = buildChallenge({ price: '50000', payTo: { solana: SYNTH_SOLANA_PAYTO }, feePayer: SYNTH_SOLANA_FEEPAYER }).accepts;
 	const header = xPaymentHeader({ network: NETWORK_SOLANA_MAINNET, payload: { transaction: 'abc' } });
 
@@ -238,14 +240,14 @@ test('settlePayment() POSTs /settle and shapes the receipt', async () => {
 
 test('paid() returns a 402 challenge when no X-PAYMENT header is present', async () => {
 	const { fetch } = stubFetch([]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const handler = server.paid(
 		{ price: '10000', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'] },
 		async (_req, res) => res.end('should not run'),
 	);
 
 	const captured = { headers: {}, body: null, ended: false };
-	const req = { url: '/api/thing', headers: { host: 'three.ws' } };
+	const req = { url: '/api/thing', headers: { host: 'example.com' } };
 	const res = {
 		statusCode: 200,
 		writableEnded: false,
@@ -266,7 +268,7 @@ test('paid() verifies, runs the handler, then settles on a paid call', async () 
 		{ body: { isValid: true, payer: SYNTH_BASE_PAYTO } },
 		{ body: { success: true, transaction: 'TX_PAID', network: NETWORK_BASE_MAINNET, payer: SYNTH_BASE_PAYTO } },
 	]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const order = [];
 	let settledReceipt = null;
 	const handler = server.paid(
@@ -282,7 +284,7 @@ test('paid() verifies, runs the handler, then settles on a paid call', async () 
 	);
 
 	const header = xPaymentHeader({ network: NETWORK_BASE_MAINNET, payload: { authorization: { value: '10000', to: SYNTH_BASE_PAYTO } } });
-	const req = { url: '/api/thing', headers: { host: 'three.ws', 'x-payment': header } };
+	const req = { url: '/api/thing', headers: { host: 'example.com', 'x-payment': header } };
 	const res = { statusCode: 200, writableEnded: false, setHeader() {}, end() { this.writableEnded = true; } };
 	const receipt = await handler(req, res);
 
@@ -296,12 +298,12 @@ test('paid() verifies, runs the handler, then settles on a paid call', async () 
 
 test('paid() supports a fetch-style adapter (Request → Response)', async () => {
 	const { fetch } = stubFetch([]);
-	const server = createX402Server({ fetch });
+	const server = createX402Server({ fetch, facilitator: FACILITATOR });
 	const handler = server.paid(
 		{ price: '5000', payTo: { base: SYNTH_BASE_PAYTO }, network: ['base'], adapter: fetchAdapter },
 		async () => new Response(JSON.stringify({ ok: true })),
 	);
-	const request = new Request('https://three.ws/api/thing');
+	const request = new Request('https://example.com/api/thing');
 	const response = await handler(request);
 	assert.equal(response.status, 402);
 	assert.ok(response.headers.get('PAYMENT-REQUIRED'));

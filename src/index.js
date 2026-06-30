@@ -1,63 +1,61 @@
-// @three-ws/x402-server — the SELLER half of x402.
+// x402-server — the SELLER half of x402.
 //
 // Framework-agnostic merchant middleware + primitives that issue a 402 Payment
 // Required challenge, verify the buyer's X-PAYMENT header against a facilitator,
-// run the work, settle on-chain, and emit the X-PAYMENT-RESPONSE receipt — the
-// exact verify → dispatch → settle order the three.ws rails enforce in
-// production. This is NOT the buyer side: it never signs or pays. Pair it with
-// the buyer-side @three-ws/x402-fetch in a test.
+// run the work, settle on-chain, and emit the X-PAYMENT-RESPONSE receipt — in
+// the canonical verify → dispatch → settle order (work runs only after a valid
+// payment; funds move only after the work succeeds). This is NOT the buyer side:
+// it never signs or pays. Pair it with any x402 buyer-side client.
 //
-// Every wire shape here is grounded in the real platform source:
-//   - challenge envelope + accept entries → api/_lib/x402-spec.js (build402Body /
-//     paymentRequirements)
-//   - facilitator /verify + /settle bodies → api/_lib/x402-spec.js
-//     (callFacilitator: { x402Version, paymentPayload, paymentRequirements })
-//   - fee split (clamp 10%, carved out of price, never marks up the buyer) →
-//     api/_lib/marketplace-platform-fee.js
+// Wire shapes follow the x402 v2 specification:
+//   - the 402 challenge envelope + accept[] entries (one per network lane)
+//   - the facilitator /verify + /settle bodies
+//     ({ x402Version, paymentPayload, paymentRequirements })
+//   - an optional platform fee split (clamped to 10%, carved out of the price,
+//     never marking up the buyer)
 //
 // See README.md for the full reference.
 
-import { createHttp, ThreeWsError } from './http.js';
+import { createHttp, X402Error } from './http.js';
 
-export { ThreeWsError, PaymentRequiredError, DEFAULT_BASE_URL } from './http.js';
+export { X402Error, PaymentRequiredError, DEFAULT_BASE_URL } from './http.js';
 
-// v2 wire format (api/_lib/x402-spec.js X402_VERSION).
+// x402 v2 wire format version.
 export const X402_VERSION = 2;
 
-// CAIP-2 network IDs, mirrored from x402-spec.js. Solana mainnet uses the
-// truncated genesis-block hash; EVM uses eip155:<chainId>.
+// CAIP-2 network IDs. Solana mainnet uses the truncated genesis-block hash;
+// EVM lanes use eip155:<chainId>.
 export const NETWORK_SOLANA_MAINNET = 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp';
 export const NETWORK_BASE_MAINNET = 'eip155:8453';
 export const NETWORK_BASE_SEPOLIA = 'eip155:84532';
 
-// The facilitator that settles Solana + Base by default. PayAI's public
-// facilitator is the platform default in api/_lib/env.js
-// (X402_FACILITATOR_URL_SOLANA / _BASE both fall back to it). Override per-route
-// with the `facilitator` option.
-export const DEFAULT_FACILITATOR_URL = 'https://facilitator.payai.network';
+// No baked-in facilitator. A seller settles against its own facilitator, set via
+// the X402_FACILITATOR_URL env var or the `facilitator`/`baseUrl` option. The
+// default is an empty string — verify/settle require a URL to be supplied.
+export const DEFAULT_FACILITATOR_URL = '';
 
-// Hard ceiling on the platform fee — a guard so a fat-fingered config can never
-// charge an absurd fee (api/_lib/marketplace-platform-fee.js MAX_FEE_BPS).
+// Hard ceiling on the optional platform fee — a guard so a fat-fingered config
+// can never charge an absurd fee.
 export const MAX_FEE_BPS = 1000; // 10%
 
-// Canonical USDC addresses per lane (api/_lib/env.js defaults). `asset: 'usdc'`
-// resolves to these; pin explicit addresses with `asset: { solana, base }`.
+// Canonical USDC mint/contract per lane. `asset: 'usdc'` (the default) resolves
+// to these; pin explicit addresses with `asset: { solana, base }`.
 const CANONICAL_USDC = {
 	solana: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
 	base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
 };
 
-// $THREE — the three.ws platform token, the second main x402 settlement asset
-// alongside USDC. Solana-only (it's an SPL mint). `asset: 'three'` resolves to
-// it; `acceptThree: true` advertises it next to USDC on the Solana lane, exactly
-// as api/_lib/x402-spec.js does server-side. 6 decimals.
+// $THREE — an optional Solana SPL settlement token advertised alongside USDC.
+// Solana-only (it's an SPL mint). `asset: 'three'` resolves to it; `acceptThree:
+// true` advertises it next to USDC on the Solana lane. 6 decimals. USDC remains
+// the default — $THREE is opt-in.
 const CANONICAL_THREE = {
 	solana: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
 };
 const THREE_DECIMALS = 6;
 
 // Maps the ergonomic lane name → CAIP-2 network id. Solana leads when both are
-// present, matching paymentRequirements()'s Solana-first ordering.
+// present (Solana-first ordering).
 const LANE_NETWORK = {
 	solana: NETWORK_SOLANA_MAINNET,
 	base: NETWORK_BASE_MAINNET,
@@ -68,9 +66,10 @@ const LANES = ['solana', 'base', 'base-sepolia'];
 
 /**
  * Create an x402-server client bound to a facilitator URL, fetch, and optional
- * auth headers. Most callers can use the zero-config defaults
- * (`buildChallenge`/`verifyPayment`/`settlePayment`/`paid`); use this to reuse a
- * facilitator override or a custom fetch across many routes.
+ * auth headers. `buildChallenge` needs no facilitator (it only constructs the
+ * 402 envelope); `verifyPayment`/`settlePayment`/`paid` settle against the
+ * facilitator from `facilitator`/`baseUrl` or the X402_FACILITATOR_URL env var.
+ * Use this to reuse a facilitator override or a custom fetch across many routes.
  *
  * @param {object} [options]
  * @param {string} [options.facilitator]  facilitator base URL for /verify + /settle.
@@ -86,7 +85,6 @@ export function createX402Server(options = {}) {
 	/**
 	 * Build the v2 402 envelope: `{ x402Version, error, resource, accepts,
 	 * extensions }` — the same object you base64 into the PAYMENT-REQUIRED header.
-	 * Mirrors api/_lib/x402-spec.js build402Body + paymentRequirements.
 	 */
 	function buildChallenge(opts = {}) {
 		return buildChallengeEnvelope(opts);
@@ -97,7 +95,7 @@ export function createX402Server(options = {}) {
 	 * accepts[] you advertised) via the facilitator's /verify. Returns
 	 * `{ ok: true, payer, accept, raw }` on success, or `{ ok: false, code,
 	 * reason, body }` (a fresh 402 body) on a rejected/under-paid payment.
-	 * **Run the work only when `ok`.** Mirrors x402-spec.js verifyPayment.
+	 * **Run the work only when `ok`.**
 	 */
 	async function verifyPayment(args = {}, expected) {
 		// Two call shapes: verifyPayment({ paymentHeader, requirements }) and the
@@ -120,7 +118,7 @@ export function createX402Server(options = {}) {
 	 * Settle a verified payment on-chain via the facilitator's /settle and return
 	 * the receipt `{ network, payer, transaction, raw }` — the object you base64
 	 * into the X-PAYMENT-RESPONSE header. Run this AFTER the work succeeds, never
-	 * before. Mirrors x402-spec.js settlePayment.
+	 * before.
 	 */
 	async function settlePayment(args = {}) {
 		const verified = args.verified || args;
@@ -141,8 +139,8 @@ export function createX402Server(options = {}) {
 	return { buildChallenge, verifyPayment, settlePayment, paid };
 }
 
-// A lazily-created shared client backs the zero-config default functions, so
-// `import { paid }` works with no setup (mirrors forge's defaultClient()).
+// A lazily-created shared client backs the default top-level functions, so
+// `import { paid }` works without first calling createX402Server().
 let shared = null;
 function defaultClient() {
 	return (shared ||= createX402Server());
@@ -167,20 +165,20 @@ export function paid(opts, handler) {
 
 // ── Challenge construction ───────────────────────────────────────────────
 
-// Build one v2 accept entry per advertised lane, in the platform's Solana-first
-// order. Each entry carries scheme/network/amount/asset/payTo/maxTimeoutSeconds
-// + the per-lane `extra` block (Solana needs a feePayer; Base pins the EIP-712
-// domain name "USD Coin"). Grounded in paymentRequirements().
+// Build one v2 accept entry per advertised lane, Solana-first. Each entry
+// carries scheme/network/amount/asset/payTo/maxTimeoutSeconds + the per-lane
+// `extra` block (Solana needs a feePayer; Base pins the EIP-712 domain name
+// "USD Coin").
 function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSeconds, resourceUrl, acceptThree, threeAmount }) {
 	if (price === undefined || price === null || String(price) === '') {
-		throw new ThreeWsError('buildChallenge() needs a `price` in atomic units.', { code: 'invalid_input' });
+		throw new X402Error('buildChallenge() needs a `price` in atomic units.', { code: 'invalid_input' });
 	}
 	const amount = String(price);
 	if (!/^\d+$/.test(amount)) {
-		throw new ThreeWsError(`price must be a whole atomic amount string, got "${amount}".`, { code: 'invalid_input' });
+		throw new X402Error(`price must be a whole atomic amount string, got "${amount}".`, { code: 'invalid_input' });
 	}
 	if (!payTo || typeof payTo !== 'object') {
-		throw new ThreeWsError('buildChallenge() needs `payTo` with at least one lane (solana / base).', { code: 'invalid_input' });
+		throw new X402Error('buildChallenge() needs `payTo` with at least one lane (solana / base).', { code: 'invalid_input' });
 	}
 
 	// Which lanes to advertise: explicit `network`, else every lane present in
@@ -194,29 +192,29 @@ function buildAccepts({ price, asset, payTo, network, feePayer, maxTimeoutSecond
 	if (acceptThree) {
 		threeAmt = threeAmount === undefined || threeAmount === null || String(threeAmount) === '' ? amount : String(threeAmount);
 		if (!/^\d+$/.test(threeAmt)) {
-			throw new ThreeWsError(`threeAmount must be a whole atomic amount string, got "${threeAmt}".`, { code: 'invalid_input' });
+			throw new X402Error(`threeAmount must be a whole atomic amount string, got "${threeAmt}".`, { code: 'invalid_input' });
 		}
 	}
 
 	const out = [];
 	for (const lane of lanes) {
 		if (!LANES.includes(lane)) {
-			throw new ThreeWsError(`Unknown network lane "${lane}". Expected one of: ${LANES.join(', ')}.`, { code: 'invalid_input' });
+			throw new X402Error(`Unknown network lane "${lane}". Expected one of: ${LANES.join(', ')}.`, { code: 'invalid_input' });
 		}
 		const to = payTo[lane];
 		if (!to) {
-			throw new ThreeWsError(`network includes "${lane}" but payTo.${lane} is not set.`, { code: 'invalid_input' });
+			throw new X402Error(`network includes "${lane}" but payTo.${lane} is not set.`, { code: 'invalid_input' });
 		}
 		out.push(buildAccept({ lane, amount, asset, payTo: to, feePayer, maxTimeoutSeconds, resourceUrl }));
-		// $THREE rides immediately after the USDC Solana accept — the platform's
-		// two main assets, Solana-first — so a wallet's token chooser surfaces both
-		// while a first-accept client still settles USDC. Mirrors paymentRequirements().
+		// When opted in, $THREE rides immediately after the USDC Solana accept, so a
+		// wallet's token chooser surfaces both while a first-accept client still
+		// settles USDC (USDC stays the default).
 		if (lane === 'solana' && acceptThree) {
 			out.push(buildAccept({ lane: 'solana', amount: threeAmt, asset: 'three', payTo: to, feePayer, maxTimeoutSeconds, resourceUrl }));
 		}
 	}
 	if (!out.length) {
-		throw new ThreeWsError('No payable lanes — set payTo for solana and/or base.', { code: 'invalid_input' });
+		throw new X402Error('No payable lanes — set payTo for solana and/or base.', { code: 'invalid_input' });
 	}
 	return out;
 }
@@ -234,10 +232,10 @@ function buildAccept({ lane, amount, asset, payTo, feePayer, maxTimeoutSeconds, 
 		...(resourceUrl ? { resource: resourceUrl } : {}),
 	};
 	if (lane === 'solana') {
-		// PayAI's Solana facilitator rejects with `missing_fee_payer` unless the
-		// accept advertises the sponsor account that co-signs the SPL transfer.
+		// A Solana facilitator rejects with `missing_fee_payer` unless the accept
+		// advertises the sponsor account that co-signs the SPL transfer.
 		if (!feePayer) {
-			throw new ThreeWsError('Solana accepts need a `feePayer` (the facilitator sponsor account) — set X402_FEE_PAYER_SOLANA.', { code: 'missing_fee_payer' });
+			throw new X402Error('Solana accepts need a `feePayer` (the facilitator sponsor account) — set X402_FEE_PAYER_SOLANA.', { code: 'missing_fee_payer' });
 		}
 		// `extra` names the settlement token — $THREE when this is a THREE accept,
 		// USDC otherwise — so a wallet labels the choice correctly.
@@ -259,7 +257,7 @@ function resolveAsset(asset, lane) {
 		// $THREE is an SPL mint — Solana only. Advertising it on an EVM lane is a
 		// misconfiguration, not a silent USDC fallback.
 		if (lane !== 'solana') {
-			throw new ThreeWsError(`$THREE settlement is Solana-only — lane "${lane}" can't advertise THREE.`, { code: 'invalid_input' });
+			throw new X402Error(`$THREE settlement is Solana-only — lane "${lane}" can't advertise THREE.`, { code: 'invalid_input' });
 		}
 		return CANONICAL_THREE.solana;
 	}
@@ -331,7 +329,6 @@ function buildChallengeEnvelope({
  * pay `price`, the creator nets `net`, the treasury receives `fee`. Returns
  * `null` when no fee applies (rate 0, no recipient, or a sub-atomic fee) so the
  * creator receives the whole price. `bps` is clamped to `[0, MAX_FEE_BPS]`.
- * Mirrors api/_lib/marketplace-platform-fee.js (resolveMarketplaceFee).
  *
  * @param {bigint|number|string} priceAtomics
  * @param {number} bps
@@ -372,35 +369,35 @@ function clampBps(bps) {
 
 function decodePaymentHeader(header) {
 	if (!header) {
-		throw new ThreeWsError('X-PAYMENT header is required.', { code: 'payment_required', status: 402 });
+		throw new X402Error('X-PAYMENT header is required.', { code: 'payment_required', status: 402 });
 	}
 	let json;
 	try {
 		json = base64Decode(String(header));
 	} catch (err) {
-		throw new ThreeWsError(`X-PAYMENT base64 decode failed: ${err?.message || err}`, { code: 'invalid_payment', status: 400 });
+		throw new X402Error(`X-PAYMENT base64 decode failed: ${err?.message || err}`, { code: 'invalid_payment', status: 400 });
 	}
 	let payload;
 	try {
 		payload = JSON.parse(json);
 	} catch (err) {
-		throw new ThreeWsError(`X-PAYMENT JSON parse failed: ${err?.message || err}`, { code: 'invalid_payment', status: 400 });
+		throw new X402Error(`X-PAYMENT JSON parse failed: ${err?.message || err}`, { code: 'invalid_payment', status: 400 });
 	}
 	if (!payload || typeof payload !== 'object') {
-		throw new ThreeWsError('X-PAYMENT must decode to a JSON object.', { code: 'invalid_payment', status: 400 });
+		throw new X402Error('X-PAYMENT must decode to a JSON object.', { code: 'invalid_payment', status: 400 });
 	}
 	return payload;
 }
 
 // Match the decoded payload to one of the offered requirements by network,
-// falling back to the first entry. Mirrors x402-spec.js selectRequirement's
-// non-EVM path (the facilitator does the deep EIP-712/Permit2 matching).
+// falling back to the first entry (the facilitator does the deep
+// EIP-712/Permit2 matching).
 function selectRequirement(paymentPayload, requirements) {
 	const network = paymentPayload?.network || paymentPayload?.accepted?.network;
 	if (network) {
 		const found = requirements.find((r) => r.network === network);
 		if (!found) {
-			throw new ThreeWsError(`payment network "${network}" is not offered by this resource.`, { code: 'unsupported_network', status: 400 });
+			throw new X402Error(`payment network "${network}" is not offered by this resource.`, { code: 'unsupported_network', status: 400 });
 		}
 		return found;
 	}
@@ -411,7 +408,7 @@ async function runVerify({ request, paymentHeader, requirements, signal }) {
 	const all = Array.isArray(requirements) ? requirements : [requirements];
 	const payable = all.filter(Boolean);
 	if (!payable.length) {
-		throw new ThreeWsError('verifyPayment() needs the `requirements` (your accepts[]) to match against.', { code: 'invalid_input' });
+		throw new X402Error('verifyPayment() needs the `requirements` (your accepts[]) to match against.', { code: 'invalid_input' });
 	}
 
 	let paymentPayload;
@@ -440,7 +437,7 @@ async function runVerify({ request, paymentHeader, requirements, signal }) {
 
 	if (!result || result.isValid !== true) {
 		const reason = result?.invalidReason || 'payment rejected by facilitator';
-		return rejected(new ThreeWsError(`payment rejected: ${reason}`, { code: 'invalid_payment', status: 402 }), payable);
+		return rejected(new X402Error(`payment rejected: ${reason}`, { code: 'invalid_payment', status: 402 }), payable);
 	}
 
 	return {
@@ -459,7 +456,7 @@ async function runSettle({ request, verified, signal }) {
 	const paymentPayload = verified?.paymentPayload;
 	const requirement = verified?.requirement || verified?.accept;
 	if (!requirement || !paymentPayload) {
-		throw new ThreeWsError('settlePayment() requires the object returned by verifyPayment().', { code: 'invalid_input' });
+		throw new X402Error('settlePayment() requires the object returned by verifyPayment().', { code: 'invalid_input' });
 	}
 
 	let result;
@@ -476,16 +473,16 @@ async function runSettle({ request, verified, signal }) {
 	}
 
 	if (!result || result.success !== true) {
-		throw new ThreeWsError(`settle failed: ${result?.errorReason || 'unknown reason'}`, { code: 'settle_failed', status: 502, body: result });
+		throw new X402Error(`settle failed: ${result?.errorReason || 'unknown reason'}`, { code: 'settle_failed', status: 502, body: result });
 	}
 
 	// Cross-check the facilitator's claimed network/payer against what we verified
-	// (defense-in-depth, mirrors x402-spec.js settlePayment).
+	// (defense-in-depth).
 	if (result.network && requirement.network && result.network !== requirement.network) {
-		throw new ThreeWsError(`facilitator /settle network mismatch: requested ${requirement.network}, got ${result.network}.`, { code: 'facilitator_bad_response', status: 502 });
+		throw new X402Error(`facilitator /settle network mismatch: requested ${requirement.network}, got ${result.network}.`, { code: 'facilitator_bad_response', status: 502 });
 	}
 	if (verified.payer && result.payer && String(result.payer).toLowerCase() !== String(verified.payer).toLowerCase()) {
-		throw new ThreeWsError(`facilitator /settle payer mismatch: verified ${verified.payer}, settled ${result.payer}.`, { code: 'facilitator_bad_response', status: 502 });
+		throw new X402Error(`facilitator /settle payer mismatch: verified ${verified.payer}, settled ${result.payer}.`, { code: 'facilitator_bad_response', status: 502 });
 	}
 
 	return {
@@ -518,11 +515,11 @@ function rejected(err, requirements) {
 // rejected payment. `/verify` failures mean no funds moved; `/settle` failures
 // are uncertain (verified + work ran).
 function mapFacilitatorError(err, path, fallbackCode = 'facilitator_unreachable') {
-	if (err instanceof ThreeWsError && err.code !== 'network_error' && err.status && err.status < 500) {
+	if (err instanceof X402Error && err.code !== 'network_error' && err.status && err.status < 500) {
 		return err;
 	}
 	const code = err?.code === 'network_error' ? fallbackCode : (err?.code || fallbackCode);
-	return new ThreeWsError(`facilitator ${path} failed: ${err?.message || err}`, {
+	return new X402Error(`facilitator ${path} failed: ${err?.message || err}`, {
 		code: fallbackCode === 'settle_uncertain' ? 'settle_uncertain' : code,
 		status: 502,
 		body: err?.body ?? null,
@@ -537,7 +534,7 @@ function mapFacilitatorError(err, path, fallbackCode = 'facilitator_unreachable'
 
 function buildPaidHandler({ buildChallenge, verifyPayment, settlePayment }, opts = {}, handler) {
 	if (typeof handler !== 'function') {
-		throw new ThreeWsError('paid(options, handler) needs a handler function.', { code: 'invalid_input' });
+		throw new X402Error('paid(options, handler) needs a handler function.', { code: 'invalid_input' });
 	}
 	const {
 		price,
@@ -560,7 +557,7 @@ function buildPaidHandler({ buildChallenge, verifyPayment, settlePayment }, opts
 	// Validate the fee config up front: a fee needs both a rate and a recipient,
 	// or it ships inert (rate 0 → no fee, no surprise billing).
 	if (feeBps > 0 && !feeTo) {
-		throw new ThreeWsError('feeBps > 0 requires feeTo (the fee recipient) — no recipient, no fee.', { code: 'invalid_input' });
+		throw new X402Error('feeBps > 0 requires feeTo (the fee recipient) — no recipient, no fee.', { code: 'invalid_input' });
 	}
 
 	// A route-scoped server when a custom facilitator is set; else the shared one.
@@ -622,7 +619,7 @@ const nodeAdapter = {
 		res.setHeader?.('content-type', 'application/json; charset=utf-8');
 		res.setHeader?.('cache-control', 'no-store');
 		// v2: the same envelope ships base64 in the PAYMENT-REQUIRED header so a
-		// Bazaar validator reads discovery off the header during its probe.
+		// discovery crawler can read it off the header during a probe request.
 		res.setHeader?.('PAYMENT-REQUIRED', base64Encode(JSON.stringify(body)));
 		res.end?.(JSON.stringify(body));
 		return undefined;

@@ -1,7 +1,7 @@
 {
-	"name": "@three-ws/x402-server",
+	"name": "@nirholas/x402-server",
 	"version": "0.1.0",
-	"description": "The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.",
+	"description": "The seller side of x402 — turn any HTTP endpoint into a paid one. Build 402 challenges, verify the X-PAYMENT header against a facilitator, dispatch the work, then settle on Solana and Base. USDC by default, with an optional $THREE (Solana SPL) settlement token.",
 	"type": "module",
 	"main": "./src/index.js",
 	"module": "./src/index.js",
@@ -33,13 +33,13 @@
 		"base",
 		"eip-3009",
 		"merchant",
+		"seller",
 		"middleware",
-		"agent-payments",
-		"three.ws"
+		"agent-payments"
 	],
-	"author": "nirholas <support@three.ws>",
+	"author": "nirholas",
 	"license": "MIT",
-	"homepage": "https://three.ws",
+	"homepage": "https://github.com/nirholas/x402-server#readme",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/nirholas/x402-server.git"

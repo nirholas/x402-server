@@ -1,6 +1,6 @@
-// Type definitions for @three-ws/x402-server
+// Type definitions for @nirholas/x402-server
 
-export declare class ThreeWsError extends Error {
+export declare class X402Error extends Error {
 	name: string;
 	code: string;
 	status: number | null;
@@ -9,7 +9,7 @@ export declare class ThreeWsError extends Error {
 	body: unknown;
 }
 
-export declare class PaymentRequiredError extends ThreeWsError {
+export declare class PaymentRequiredError extends X402Error {
 	accepts: unknown | null;
 }
 
@@ -59,8 +59,9 @@ export interface PayTo {
 }
 
 /**
- * Settlement asset. `'usdc'` resolves canonical USDC per lane; `'three'` resolves
- * the $THREE platform token (Solana-only); or pin explicit addresses per lane.
+ * Settlement asset. `'usdc'` (the default) resolves canonical USDC per lane;
+ * `'three'` resolves the optional $THREE SPL token (Solana-only); or pin explicit
+ * addresses per lane.
  */
 export type Asset = 'usdc' | 'three' | { solana?: string; base?: string };
 
@@ -74,8 +75,8 @@ export interface BuildChallengeOptions {
 	/** The Solana facilitator sponsor account (required for a Solana accept). */
 	feePayer?: string;
 	/**
-	 * Advertise $THREE alongside USDC on the Solana lane (a second accept, pushed
-	 * after USDC). The platform's two main x402 assets in one challenge.
+	 * Advertise the optional $THREE SPL token alongside USDC on the Solana lane (a
+	 * second accept, pushed after USDC). USDC stays the default; this is opt-in.
 	 */
 	acceptThree?: boolean;
 	/**
