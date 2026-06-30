@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@nirholas/x402-server"><img alt="npm version" src="https://img.shields.io/npm/v/@nirholas/x402-server?logo=npm&color=cb3837"></a>
   <a href="https://www.npmjs.com/package/@nirholas/x402-server"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@nirholas/x402-server?color=cb3837"></a>
-  <a href="./LICENSE"><img alt="license" src="https://img.shields.io/npm/l/@nirholas/x402-server?color=3b82f6"></a>
+  <a href="./LICENSE"><img alt="License: Proprietary" src="https://img.shields.io/badge/license-Proprietary-red.svg"></a>
   <a href="https://nodejs.org"><img alt="node" src="https://img.shields.io/node/v/@nirholas/x402-server?color=339933&logo=node.js"></a>
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-0-44cc11">
 </p>
@@ -695,4 +695,4 @@ keep it zero-dependency, and add a test for every behavior change.
 
 ## License
 
-[MIT](./LICENSE) © nirholas
+Proprietary — Copyright (c) 2026 nirholas. All Rights Reserved. Unauthorized use, copying, modification, or distribution is prohibited. See [LICENSE](./LICENSE).

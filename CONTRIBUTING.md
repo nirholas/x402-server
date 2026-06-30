@@ -86,4 +86,5 @@ Open an issue at <https://github.com/nirholas/x402-server/issues> with:
 ## License
 
 By contributing you agree your contributions are licensed under the project's
-[MIT license](./LICENSE).
+proprietary license. Proprietary — Copyright (c) 2026 nirholas. All Rights Reserved.
+Unauthorized use, copying, modification, or distribution is prohibited. See [LICENSE](./LICENSE).
