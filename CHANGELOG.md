@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@nirholas/x402-server` are documented here.
+All notable changes to `@three-ws/x402-server` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CONTRIBUTING.md`.
 
 ### Changed
-- Published as `@nirholas/x402-server`. Host-neutral: no facilitator host is baked
+- Published as `@three-ws/x402-server`. Host-neutral: no facilitator host is baked
   in — the facilitator URL is supplied per call or via `X402_FACILITATOR_URL`.
 - The shared error type is `X402Error` (USDC remains the default asset).
 

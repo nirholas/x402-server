@@ -1,4 +1,4 @@
-# Contributing to `@nirholas/x402-server`
+# Contributing to `@three-ws/x402-server`
 
 Thanks for helping improve the seller side of x402. This package is small, sharp,
 and deliberately **zero-dependency** — contributions should keep it that way.

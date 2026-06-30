@@ -1,14 +1,14 @@
-<h1 align="center">@nirholas/x402-server</h1>
+<h1 align="center">@three-ws/x402-server</h1>
 
 <p align="center"><strong>The seller side of <a href="https://x402.org">x402</a> — turn any HTTP endpoint into a paid one in a few lines.</strong></p>
 
 <p align="center">Build the <code>402</code> challenge · verify the payment · run the work · settle on-chain · return the receipt.</p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@nirholas/x402-server"><img alt="npm version" src="https://img.shields.io/npm/v/@nirholas/x402-server?logo=npm&color=cb3837"></a>
-  <a href="https://www.npmjs.com/package/@nirholas/x402-server"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@nirholas/x402-server?color=cb3837"></a>
+  <a href="https://www.npmjs.com/package/@three-ws/x402-server"><img alt="npm version" src="https://img.shields.io/npm/v/@three-ws/x402-server?logo=npm&color=cb3837"></a>
+  <a href="https://www.npmjs.com/package/@three-ws/x402-server"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@three-ws/x402-server?color=cb3837"></a>
   <a href="./LICENSE"><img alt="License: Proprietary" src="https://img.shields.io/badge/license-Proprietary-red.svg"></a>
-  <a href="https://nodejs.org"><img alt="node" src="https://img.shields.io/node/v/@nirholas/x402-server?color=339933&logo=node.js"></a>
+  <a href="https://nodejs.org"><img alt="node" src="https://img.shields.io/node/v/@three-ws/x402-server?color=339933&logo=node.js"></a>
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-0-44cc11">
 </p>
 
@@ -26,7 +26,7 @@
 
 ---
 
-`@nirholas/x402-server` is the **seller** half of x402: the middleware and
+`@three-ws/x402-server` is the **seller** half of x402: the middleware and
 primitives that make an HTTP endpoint demand payment. Wrap a route with
 [`paid()`](#paidoptions-handler--reqresnext--void) and it answers an unpaid
 request with a `402 Payment Required` challenge — listing what it `accepts`
@@ -39,7 +39,7 @@ It speaks two lanes from one config: **Solana** (facilitator-settled SPL
 `transferChecked`) and **EVM / Base** (gasless
 [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009)
 `transferWithAuthorization`). It never signs or pays — pair it with any x402
-buyer-side client such as [`@nirholas/x402-fetch`](#pairing-with-a-buyer); they
+buyer-side client such as [`@three-ws/x402-fetch`](#pairing-with-a-buyer); they
 pay, this charges.
 
 ## Why
@@ -74,7 +74,7 @@ This package is that machinery, done once.
 ## Install
 
 ```bash
-npm install @nirholas/x402-server
+npm install @three-ws/x402-server
 ```
 
 Node 18+ (uses the global `fetch`). Zero runtime dependencies. Framework-agnostic:
@@ -100,7 +100,7 @@ Now wrap a handler. Unpaid requests get a `402`; paid ones run the handler:
 ```js
 // server.mjs — node server.mjs, then POST to http://localhost:3000/summarize
 import express from 'express';
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 const app = express();
 app.use(express.json());
@@ -227,7 +227,7 @@ a facilitator outage surfaces as an `X402Error` with `status: 502`
 (`facilitator_unreachable` on `/verify`, `settle_uncertain` on `/settle`).
 
 ```js
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 export default paid(
   { price: '10000', asset: 'usdc', payTo: { base: '0xYourPayoutAddress' }, network: ['base'] },
@@ -327,7 +327,7 @@ sub-atomic fee) so the creator keeps the whole price. `bps` is clamped to
 `[0, 1000]` (`MAX_FEE_BPS`, 10%).
 
 ```js
-import { feeSplit } from '@nirholas/x402-server';
+import { feeSplit } from '@three-ws/x402-server';
 
 feeSplit('1000000', 250, 'YourFeeRecipient');
 // → { price: '1000000', net: '975000', fee: '25000', bps: 250, recipient: 'YourFeeRecipient' }
@@ -344,7 +344,7 @@ client — handy to share a facilitator override or custom `fetch` across many
 routes. Returns `{ buildChallenge, verifyPayment, settlePayment, paid }`.
 
 ```js
-import { createX402Server } from '@nirholas/x402-server';
+import { createX402Server } from '@three-ws/x402-server';
 
 const server = createX402Server({
   facilitator: 'https://your-facilitator.example.com',
@@ -366,7 +366,7 @@ An adapter that lets `paid()` serve Web `Request` / `Response` runtimes
 headers are attached to the `Response` automatically.
 
 ```js
-import { paid, fetchAdapter } from '@nirholas/x402-server';
+import { paid, fetchAdapter } from '@three-ws/x402-server';
 
 export default {
   fetch: paid(
@@ -493,7 +493,7 @@ two Solana accepts (USDC first, then `$THREE`), so a wallet's token chooser
 surfaces both while a first-accept client still settles USDC:
 
 ```js
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 export default paid(
   {
@@ -524,14 +524,14 @@ Omit both options and the route is USDC-only.
 ## Pairing with a buyer
 
 This package only *charges*. To *pay* one of its endpoints, use any x402
-buyer-side client — for example [`@nirholas/x402-fetch`](https://www.npmjs.com/package/@nirholas/x402-fetch),
+buyer-side client — for example [`@three-ws/x402-fetch`](https://www.npmjs.com/package/@three-ws/x402-fetch),
 the seller's natural counterpart. It wraps `fetch`: on a `402` it reads the
 `accepts[]`, signs and pays the chosen lane, and re-sends with the `X-PAYMENT`
 header — transparently, so the call looks free to your code.
 
 ```js
 // Buyer side (in a separate app / agent)
-import { wrapFetch } from '@nirholas/x402-fetch';
+import { wrapFetch } from '@three-ws/x402-fetch';
 
 // `signer` is a wallet that can sign the SPL / EIP-3009 payment.
 const pay = wrapFetch(fetch, { signer });
@@ -681,7 +681,7 @@ to preview the split. It ships inert until both are set.
 - **[docs/api.md](./docs/api.md)** — exhaustive API reference for every export.
 - **[docs/examples.md](./docs/examples.md)** — runnable Express, Vercel, USDC-only,
   and USDC + optional `$THREE` examples.
-- **[`@nirholas/x402-fetch`](https://www.npmjs.com/package/@nirholas/x402-fetch)** —
+- **[`@three-ws/x402-fetch`](https://www.npmjs.com/package/@three-ws/x402-fetch)** —
   the buyer half: a payment-aware `fetch` that pays these endpoints automatically.
 - **[x402 specification](https://x402.org)** — the protocol this implements
   (v2 wire format).

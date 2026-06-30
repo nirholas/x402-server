@@ -1,4 +1,4 @@
-# API reference — `@nirholas/x402-server`
+# API reference — `@three-ws/x402-server`
 
 The complete public surface of the seller-side SDK. Every export, every
 signature, every option, return shape, and error. For task-oriented examples see
@@ -15,7 +15,7 @@ import {
   X402_VERSION, MAX_FEE_BPS,
   DEFAULT_FACILITATOR_URL, DEFAULT_BASE_URL,
   NETWORK_SOLANA_MAINNET, NETWORK_BASE_MAINNET, NETWORK_BASE_SEPOLIA,
-} from '@nirholas/x402-server';
+} from '@three-ws/x402-server';
 ```
 
 ---
@@ -346,7 +346,7 @@ option to [`paid()`](#paidoptions-handler) and your handler becomes
   `200` with the receipt header.
 
 ```js
-import { paid, fetchAdapter } from '@nirholas/x402-server';
+import { paid, fetchAdapter } from '@three-ws/x402-server';
 
 export default {
   fetch: paid(

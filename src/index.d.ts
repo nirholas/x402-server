@@ -1,4 +1,4 @@
-// Type definitions for @nirholas/x402-server
+// Type definitions for @three-ws/x402-server
 
 export declare class X402Error extends Error {
 	name: string;

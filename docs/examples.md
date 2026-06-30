@@ -1,4 +1,4 @@
-# Examples — `@nirholas/x402-server`
+# Examples — `@three-ws/x402-server`
 
 Runnable recipes for the seller side of x402. Each is complete — copy it, set
 your facilitator and payout addresses, and run it. For the full API see
@@ -33,7 +33,7 @@ The fastest path: wrap an existing route handler with `paid()`.
 ```js
 // express-seller.mjs  →  node express-seller.mjs
 import express from 'express';
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 const app = express();
 app.use(express.json());
@@ -72,7 +72,7 @@ the `X-PAYMENT-RESPONSE` receipt.
 
 ```js
 // api/report.mjs  (Vercel)
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 async function generate(topic) {
   return `Report on ${topic}: …`;
@@ -106,7 +106,7 @@ verify → dispatch → settle flow.
 ```js
 // raw-seller.mjs  →  node raw-seller.mjs
 import { createServer } from 'node:http';
-import { buildChallenge, verifyPayment, settlePayment } from '@nirholas/x402-server';
+import { buildChallenge, verifyPayment, settlePayment } from '@three-ws/x402-server';
 
 const ROUTE = {
   price: '50000',                         // $0.05 USDC
@@ -175,7 +175,7 @@ Advertise Solana **and** Base from one config and take a 2.5% platform cut, spli
 
 ```js
 // dual-lane.mjs
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 export default paid(
   {
@@ -201,7 +201,7 @@ export default paid(
 Preview the split without an HTTP call:
 
 ```js
-import { feeSplit } from '@nirholas/x402-server';
+import { feeSplit } from '@three-ws/x402-server';
 feeSplit('1000000', 250, 'YourFeeRecipient');
 // → { price: '1000000', net: '975000', fee: '25000', bps: 250, recipient: 'YourFeeRecipient' }
 ```
@@ -220,7 +220,7 @@ settles USDC.
 
 ```js
 // usdc-plus-three.mjs
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 export default paid(
   {
@@ -241,7 +241,7 @@ To make `$THREE` the **only** asset on a route (Solana-only — an EVM lane
 throws), set `asset: 'three'`:
 
 ```js
-import { paid } from '@nirholas/x402-server';
+import { paid } from '@three-ws/x402-server';
 
 export default paid(
   {
@@ -265,7 +265,7 @@ handler receives `(request, payment)` and returns a `Response`.
 
 ```js
 // worker.mjs  (Cloudflare Workers / Deno / Bun)
-import { paid, fetchAdapter } from '@nirholas/x402-server';
+import { paid, fetchAdapter } from '@three-ws/x402-server';
 
 export default {
   fetch: paid(
@@ -295,7 +295,7 @@ routes. Use `onSettled` to feed a dashboard or webhook on every paid call.
 ```js
 // metered-service.mjs
 import express from 'express';
-import { createX402Server } from '@nirholas/x402-server';
+import { createX402Server } from '@three-ws/x402-server';
 
 const server = createX402Server({
   facilitator: process.env.X402_FACILITATOR_URL,
