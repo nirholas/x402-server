@@ -695,4 +695,4 @@ keep it zero-dependency, and add a test for every behavior change.
 
 ## License
 
-Proprietary — Copyright (c) 2026 nirholas. All Rights Reserved. Unauthorized use, copying, modification, or distribution is prohibited. See [LICENSE](./LICENSE).
+All rights reserved. See [LICENSE](LICENSE).
