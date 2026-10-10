@@ -1,0 +1,19 @@
+# @three-ws/x402-server
+
+> The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.
+
+@three-ws/x402-server is a JavaScript library from three.ws. Install: `npm install @three-ws/x402-server`.
+
+## Docs
+
+- [README](https://github.com/nirholas/x402-server/blob/main/README.md): install, configuration, full reference
+- [Documentation site](https://nirholas.github.io/x402-server/): the README as a web page
+- [Full text for LLMs](https://nirholas.github.io/x402-server/llms-full.txt): README inlined
+- [AGENTS.md](https://github.com/nirholas/x402-server/blob/main/AGENTS.md): guidance for coding agents
+
+## Project
+
+- [Source](https://github.com/nirholas/x402-server)
+- [npm](https://www.npmjs.com/package/@three-ws/x402-server)
+- [three.ws](https://three.ws): the platform this is part of
+- [Issues](https://github.com/nirholas/x402-server/issues)

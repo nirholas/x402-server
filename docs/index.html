@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>@three-ws/x402-server: The merchant side of x402</title>
+<meta name="description" content="The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.">
+<link rel="canonical" href="https://nirholas.github.io/x402-server/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="three.ws">
+<meta property="og:title" content="@three-ws/x402-server">
+<meta property="og:description" content="The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.">
+<meta property="og:url" content="https://nirholas.github.io/x402-server/">
+<meta property="og:image" content="https://nirholas.github.io/x402-server/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="@three-ws/x402-server">
+<meta name="twitter:description" content="The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.">
+<meta name="twitter:image" content="https://nirholas.github.io/x402-server/og.png">
+<meta name="keywords" content="x402, 402, payment-required, paywall, usdc, three, solana, base, eip-3009, merchant, middleware, agent-payments, three.ws, ai-agents">
+<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt">
+<link rel="icon" href="https://three.ws/three-ws-mcp-icon.svg" type="image/svg+xml">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"@three-ws/x402-server","description":"The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.","codeRepository":"https://github.com/nirholas/x402-server","programmingLanguage":"JavaScript","license":"https://spdx.org/licenses/Apache-2.0.html","version":"0.1.3","url":"https://nirholas.github.io/x402-server/","author":{"@type":"Organization","name":"three.ws","url":"https://three.ws"},"keywords":"x402, 402, payment-required, paywall, usdc, three, solana, base, eip-3009, merchant, middleware, agent-payments, three.ws, ai-agents"}</script>
+<style>:root{--bg:#fff;--fg:#111418;--mut:#586069;--line:#e3e6ea;--acc:#2563eb;--code:#f4f6f8;--card:#fafbfc}
+@media(prefers-color-scheme:dark){:root{--bg:#0b0d10;--fg:#e8eaed;--mut:#9aa3ad;--line:#232830;--acc:#6ea0ff;--code:#14181d;--card:#10141a}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--acc)}a:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+header.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:700;text-decoration:none;color:var(--fg)}
+.bar nav{margin-left:auto;display:flex;gap:16px;font-size:14px}
+.bar nav a{color:var(--mut);text-decoration:none;transition:color .15s}.bar nav a:hover{color:var(--fg)}
+.hero{max-width:1100px;margin:0 auto;padding:48px 16px 24px}
+.hero h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
+.hero p{color:var(--mut);max-width:70ch;font-size:18px;margin:0 0 24px}
+.install{display:flex;align-items:center;gap:8px;max-width:620px;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 14px}
+.install code{flex:1;overflow-x:auto;white-space:nowrap;font:14px ui-monospace,SFMono-Regular,Menlo,monospace}
+.install button{border:0;background:var(--acc);color:#fff;border-radius:7px;padding:8px 14px;font:600 13px system-ui;cursor:pointer;transition:transform .12s,opacity .12s}
+.install button:hover{opacity:.9}.install button:active{transform:scale(.96)}
+.cta{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.cta a{padding:9px 16px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;color:var(--fg);transition:border-color .15s,transform .15s}
+.cta a:hover{border-color:var(--acc);transform:translateY(-1px)}.cta a.pri{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.layout{max-width:1100px;margin:0 auto;padding:8px 16px 64px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:40px}
+@media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}.toc{display:none}}
+.toc{position:sticky;top:76px;align-self:start;font-size:14px;border-left:1px solid var(--line);padding-left:16px}
+.toc p{margin:0 0 8px;font-weight:700;color:var(--mut);text-transform:uppercase;font-size:12px;letter-spacing:.06em}
+.toc ul{list-style:none;margin:0;padding:0}.toc li{margin:6px 0}.toc a{color:var(--mut);text-decoration:none}.toc a:hover{color:var(--fg)}
+main{min-width:0;overflow-wrap:anywhere}main pre code{overflow-wrap:normal}main img{max-width:100%;height:auto}
+main h2{margin-top:2.2em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+.anchor{margin-left:-1.1em;padding-right:.4em;text-decoration:none;opacity:0;color:var(--mut)}h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-size:14px;line-height:1.5}
+code{font:0.9em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:.15em .35em;border-radius:5px}pre code{background:none;padding:0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%}th,td{border:1px solid var(--line);padding:8px 12px;text-align:left}th{background:var(--card)}
+blockquote{margin:1em 0;padding:.2em 1em;border-left:4px solid var(--line);color:var(--mut)}
+footer{border-top:1px solid var(--line);color:var(--mut);font-size:14px}
+.foot-in{max-width:1100px;margin:0 auto;padding:24px 16px;display:flex;gap:16px;flex-wrap:wrap}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}</style>
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+<a class="brand" href="https://nirholas.github.io/x402-server/">@three-ws/x402-server</a>
+<nav aria-label="Project links"><a href="https://github.com/nirholas/x402-server">GitHub</a><a href="https://www.npmjs.com/package/@three-ws/x402-server">npm</a><a href="llms.txt">llms.txt</a><a href="https://three.ws">three.ws</a></nav>
+</div></header>
+<section class="hero">
+<h1>@three-ws/x402-server</h1>
+<p>The merchant side of x402 — turn any HTTP endpoint into a paid one. Issue 402 challenges, price SKUs, verify and settle the X-PAYMENT header on Solana and Base, and take a platform fee. Advertise the two main assets — USDC and $THREE — in one challenge.</p>
+<div class="install" role="group" aria-label="Install command"><code>npm install @three-ws/x402-server</code><button type="button" data-copy="npm install @three-ws/x402-server">Copy</button></div>
+<div class="cta"><a class="pri" href="https://github.com/nirholas/x402-server">View on GitHub</a><a href="https://github.com/nirholas/x402-server/stargazers">Star the repo</a></div>
+</section>
+<div class="layout">
+<main id="content"><p align="center"><strong>The merchant side of <a href="https://x402.org">x402</a> — turn any HTTP endpoint into a paid one in a few lines. Issue the 402, price the work, verify and settle the payment, take your fee.</strong></p><p align="center">
+  <a href="https://www.npmjs.com/package/@three-ws/x402-server"><img alt="npm" src="https://img.shields.io/npm/v/@three-ws/x402-server?logo=npm&color=cb3837"></a>
+  <a href="https://www.npmjs.com/package/@three-ws/x402-server"><img alt="downloads" src="https://img.shields.io/npm/dm/@three-ws/x402-server?color=cb3837"></a>
+  <img alt="license" src="https://img.shields.io/npm/l/@three-ws/x402-server?color=3b82f6">
+  <img alt="node" src="https://img.shields.io/node/v/@three-ws/x402-server?color=339933&logo=node.js">
+</p><p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#api">API</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#payment">Payment</a> ·
+  <a href="https://three.ws">three.ws</a>
+</p><hr>
+<blockquote>
+<p><code>@three-ws/x402-server</code> is the <strong>seller</strong> half of x402: the middleware and
+primitives that make an endpoint demand payment. Wrap a route with <code>paid()</code>
+and it answers an unpaid request with a <code>402 Payment Required</code> challenge —
+listing what it <code>accepts</code> (asset · amount · network · pay-to) — then, on the
+retry that carries an <code>X-PAYMENT</code> header, it verifies the payment, runs your
+handler, settles on-chain, and returns the result with an <code>X-PAYMENT-RESPONSE</code>
+receipt. It speaks the two lanes the three.ws rails already run in production:
+<strong>Solana</strong> (facilitator-settled SPL <code>transferChecked</code>) and <strong>EVM / Base</strong>
+(gasless <a href="https://eips.ethereum.org/EIPS/eip-3009">EIP-3009</a>
+<code>transferWithAuthorization</code>). It is the server twin of the buyer-side
+<a href="https://www.npmjs.com/package/@three-ws/x402-fetch"><code>@three-ws/x402-fetch</code></a>
+and <a href="https://www.npmjs.com/package/@three-ws/x402-modal"><code>@three-ws/x402-modal</code></a> —
+they pay; this charges.</p>
+</blockquote>
+<h2 id="why"><a class="anchor" href="#why" aria-label="Link to this section">#</a>Why</h2>
+<p>x402 revives HTTP <code>402 Payment Required</code> as a real payment rail: a server
+answers a request with a <code>402</code> whose body lists its <code>accepts[]</code>, the client
+pays, and re-sends the request with an <code>X-PAYMENT</code> header. The buyer side is a
+solved problem — drop in a fetch wrapper or the modal and it pays. <strong>The seller
+side is where everyone reinvents the same machinery:</strong> build the challenge
+envelope in the exact v2 shape, advertise the right asset/fee-payer per chain,
+parse the <code>X-PAYMENT</code> header, call a facilitator&#39;s <code>/verify</code>, run the work
+<em>only after</em> verification, settle <em>only after</em> the work succeeds, emit the
+receipt, and skim a platform fee out of the price without double-charging the
+buyer.</p>
+<p>This package is that machinery, done once, the way the three.ws merchant rails
+do it:</p>
+<ul>
+<li><strong>One wrapper, a paid route.</strong> <code>paid({ price, asset, payTo })</code> emits the 402
+and gates your handler behind a verified payment.</li>
+<li><strong>Two lanes, one API.</strong> Solana and Base/EVM accepts come from the same config;
+the challenge advertises both and the buyer picks.</li>
+<li><strong>Settle after the work, never before.</strong> Verification gates the handler;
+settlement runs after it returns <code>200</code>. A failed call moves no funds, so a
+retry can&#39;t double-charge.</li>
+<li><strong>Fee without surprise-billing.</strong> A platform fee is split out of the listed
+price — the buyer&#39;s total is never marked up, and the fee ships inert (rate
+<code>0</code>, no treasury) until you turn it on.</li>
+</ul>
+<p>This is the same flow that powers paid MCP tools and hosted checkout SKUs on
+<a href="https://three.ws">three.ws</a>; the package is its standalone, embeddable home.</p>
+<h2 id="install"><a class="anchor" href="#install" aria-label="Link to this section">#</a>Install</h2>
+<pre><code class="language-bash">npm install @three-ws/x402-server
+</code></pre>
+<p>Node 18+ (uses the global <code>fetch</code> and Web Crypto). Framework-agnostic: works as
+Express/Connect middleware, a Fastify hook, or a bare <code>(req, res)</code> handler on
+Vercel / Node <code>http</code>. For the buyer side of a test, pair with
+<a href="https://www.npmjs.com/package/@three-ws/x402-fetch"><code>@three-ws/x402-fetch</code></a>.</p>
+<h2 id="quick-start"><a class="anchor" href="#quick-start" aria-label="Link to this section">#</a>Quick start</h2>
+<h3 id="the-one-liner-paid"><a class="anchor" href="#the-one-liner-paid" aria-label="Link to this section">#</a>The one-liner — <code>paid()</code></h3>
+<p>Wrap a handler. Unpaid requests get a <code>402</code>; paid ones run the handler:</p>
+<pre><code class="language-js">import { paid } from &#39;@three-ws/x402-server&#39;;
+
+export default paid(
+  { price: &#39;10000&#39;, asset: &#39;usdc&#39;, payTo: { solana: &#39;THREEsynthetic1111…&#39; } },
+  async (req, res) =&gt; {
+    res.json({ summary: await summarize(req.body.text) });
+  },
+);
+</code></pre>
+<p><code>price</code> is in <strong>atomic units</strong> of the asset — <code>&#39;10000&#39;</code> is <code>$0.01</code> of 6-decimal
+USDC. The first unpaid <code>GET</code>/<code>POST</code> returns the challenge; the buyer pays and
+re-sends with <code>X-PAYMENT</code>; your handler runs once, settlement lands, and the
+response carries the on-chain receipt.</p>
+<p>The Solana lane also needs the facilitator&#39;s sponsor account: set
+<code>X402_FEE_PAYER_SOLANA</code> in the environment (or pass <code>feePayer</code>), or the
+challenge throws <code>missing_fee_payer</code>. The EVM lane needs neither.</p>
+<h3 id="a-fuller-route-both-lanes-a-fee-a-receipt"><a class="anchor" href="#a-fuller-route-both-lanes-a-fee-a-receipt" aria-label="Link to this section">#</a>A fuller route — both lanes, a fee, a receipt</h3>
+<pre><code class="language-js">import { paid } from &#39;@three-ws/x402-server&#39;;
+
+export default paid(
+  {
+    price: &#39;50000&#39;,                 // $0.05 USDC (6-decimal atomics)
+    asset: &#39;usdc&#39;,
+    payTo: {
+      solana: &#39;THREEsynthetic1111…&#39;,          // SPL pay-to
+      base:   &#39;0xPlatformPayoutAddress…&#39;,      // EVM pay-to
+    },
+    network: [&#39;solana&#39;, &#39;base&#39;],    // advertise both accepts; buyer chooses
+    feeBps: 250,                    // 2.5% platform fee, split out of the price
+    feeTo:  &#39;TREASURYsynthetic1111…&#39;,
+    description: &#39;Document summarization&#39;,
+    serviceName: &#39;Acme Summarize&#39;,
+  },
+  async (req, res, payment) =&gt; {
+    // `payment` is the verified payer + accept — present only on a paid call.
+    const out = await summarize(req.body.text);
+    res.json({ summary: out, billedTo: payment.payer });
+  },
+);
+</code></pre>
+<h3 id="under-the-hood-the-raw-402-sign-settle-flow"><a class="anchor" href="#under-the-hood-the-raw-402-sign-settle-flow" aria-label="Link to this section">#</a>Under the hood — the raw 402 → sign → settle flow</h3>
+<p><code>paid()</code> wraps four primitives you can drive directly when you don&#39;t want the
+middleware:</p>
+<pre><code class="language-js">import {
+  buildChallenge,   // → the 402 envelope (x402Version, resource, accepts[], extensions)
+  verifyPayment,    // X-PAYMENT header → { ok, payer, accept } (calls the facilitator /verify)
+  settlePayment,    // verified payment → on-chain settlement + receipt
+  feeSplit,         // (price, bps) → { net, fee, recipient }
+} from &#39;@three-ws/x402-server&#39;;
+
+export default async function handler(req, res) {
+  const accepts = [
+    { scheme: &#39;exact&#39;, network: &#39;solana:5eykt…&#39;, asset: &#39;EPjF…USDC&#39;, payTo, amount: &#39;50000&#39;,
+      maxTimeoutSeconds: 60, extra: { name: &#39;USDC&#39;, decimals: 6, feePayer } },
+  ];
+
+  const header = req.headers[&#39;x-payment&#39;];
+  if (!header) {
+    // 1 — challenge. Body + base64 PAYMENT-REQUIRED header (Bazaar reads both).
+    const body = buildChallenge({ resourceUrl: req.url, accepts });
+    res.statusCode = 402;
+    res.setHeader(&#39;PAYMENT-REQUIRED&#39;, Buffer.from(JSON.stringify(body)).toString(&#39;base64&#39;));
+    return res.end(JSON.stringify(body));
+  }
+
+  // 2 — verify the X-PAYMENT against the same accepts. No work runs if this fails.
+  const v = await verifyPayment({ paymentHeader: header, requirements: accepts });
+  if (!v.ok) { res.statusCode = 402; return res.end(JSON.stringify(v.body)); }
+
+  // 3 — run the work, THEN settle (never before — a failed call moves no funds).
+  const result = await summarize(req.body.text);
+  const settled = await settlePayment({ verified: v });
+
+  res.setHeader(&#39;X-PAYMENT-RESPONSE&#39;,
+    Buffer.from(JSON.stringify(settled)).toString(&#39;base64&#39;));
+  res.json({ result, payer: v.payer, tx: settled.transaction });
+}
+</code></pre>
+<p>This is exactly the order the three.ws rails enforce: <strong>verify → dispatch →
+settle</strong>. Settlement is the last step, so a handler that throws never charges.</p>
+<h2 id="api"><a class="anchor" href="#api" aria-label="Link to this section">#</a>API</h2>
+<h3 id="paidoptions-handler-req-res-void"><a class="anchor" href="#paidoptions-handler-req-res-void" aria-label="Link to this section">#</a><code>paid(options, handler) → (req, res) =&gt; void</code></h3>
+<p>Wrap a request handler so it requires payment. Returns a standard <code>(req, res)</code>
+function — mount it as Express/Connect middleware, a Vercel function, or a Node
+<code>http</code> handler.</p>
+<p><strong>Options</strong></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>price</code></td>
+<td><code>string</code></td>
+<td>— (<strong>required</strong>)</td>
+<td>Amount in <strong>atomic units</strong> of the asset (<code>&#39;10000&#39;</code> = <code>$0.01</code> of 6-decimal USDC).</td>
+</tr>
+<tr>
+<td><code>asset</code></td>
+<td><code>&#39;usdc&#39; | { solana?, base? }</code></td>
+<td><code>&#39;usdc&#39;</code></td>
+<td>Settlement asset. A string resolves the canonical USDC mint/contract per chain; an object pins explicit addresses.</td>
+</tr>
+<tr>
+<td><code>payTo</code></td>
+<td><code>{ solana?, base? }</code></td>
+<td>— (<strong>required</strong>)</td>
+<td>Pay-to address per lane. At least one chain is required.</td>
+</tr>
+<tr>
+<td><code>network</code></td>
+<td><code>(&#39;solana&#39; | &#39;base&#39;)[]</code></td>
+<td>from <code>payTo</code></td>
+<td>Which accepts to advertise. Solana leads when both are present.</td>
+</tr>
+<tr>
+<td><code>feePayer</code></td>
+<td><code>string</code></td>
+<td><code>X402_FEE_PAYER_SOLANA</code></td>
+<td>The facilitator&#39;s Solana sponsor account, advertised as <code>extra.feePayer</code>. <strong>Required for the Solana lane</strong> (option or env), otherwise building the challenge throws <code>missing_fee_payer</code>. Ignored on EVM.</td>
+</tr>
+<tr>
+<td><code>feeBps</code></td>
+<td><code>number</code></td>
+<td><code>0</code></td>
+<td>Platform fee in basis points, <strong>split out of <code>price</code></strong> (≤ <code>1000</code> / 10%). <code>0</code> = no fee.</td>
+</tr>
+<tr>
+<td><code>feeTo</code></td>
+<td><code>string</code></td>
+<td>—</td>
+<td>Fee recipient. Required when <code>feeBps &gt; 0</code> — no recipient, no fee.</td>
+</tr>
+<tr>
+<td><code>facilitator</code></td>
+<td><code>string</code></td>
+<td>platform default</td>
+<td>Override the x402 facilitator base URL used for <code>/verify</code> + <code>/settle</code>.</td>
+</tr>
+<tr>
+<td><code>maxTimeoutSeconds</code></td>
+<td><code>number</code></td>
+<td><code>60</code></td>
+<td>How long the buyer has to land the signed payment.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>string</code></td>
+<td>—</td>
+<td>Human label for the <code>resource</code> in the challenge (shown in wallets/the modal).</td>
+</tr>
+<tr>
+<td><code>serviceName</code> / <code>tags</code> / <code>iconUrl</code></td>
+<td><code>string</code> / <code>string[]</code> / <code>string</code></td>
+<td>—</td>
+<td>Bazaar discovery metadata echoed into the challenge.</td>
+</tr>
+<tr>
+<td><code>streaming</code></td>
+<td><code>boolean</code></td>
+<td><code>false</code></td>
+<td>Response ordering. <code>false</code> = deliver-then-settle (buffer the response, settle, flush with the receipt header). <code>true</code> = settle-then-stream, for self-flushing handlers (binary download, SSE, <code>res.pipe</code>). Node adapter only.</td>
+</tr>
+<tr>
+<td><code>onSettled</code></td>
+<td><code>(receipt) =&gt; void</code></td>
+<td>—</td>
+<td>Fired after a successful settlement — record the call, fire a webhook.</td>
+</tr>
+</tbody></table>
+<p><strong>Handler</strong> — <code>(req, res, payment) =&gt; unknown</code>. <code>payment</code> is present only on a
+paid call: <code>{ payer, network, accept, amount }</code>. Write your response
+(<code>res.json(...)</code>) <strong>or</strong> just <code>return</code> a value — either way the wrapper holds
+the bytes until settlement lands (see <a href="#response-modes">Response modes</a>).
+Throwing from the handler <strong>skips settlement</strong> (no funds move) and returns a
+<code>500</code> the buyer can retry with the same payment.</p>
+<h3 id="response-modes"><a class="anchor" href="#response-modes" aria-label="Link to this section">#</a>Response modes</h3>
+<p><code>paid()</code> guarantees the buyer never receives the good before settlement, two ways:</p>
+<ul>
+<li><strong>Deliver-then-settle (default).</strong> The handler&#39;s response is <strong>buffered</strong>, the
+payment settles, then the <code>200</code> is flushed with the <code>X-PAYMENT-RESPONSE</code>
+receipt header attached. Handlers may <code>res.json(...)</code>/<code>res.end(...)</code> or return
+a value. Best for JSON APIs.</li>
+<li><strong>Settle-then-stream (<code>streaming: true</code>).</strong> For responses you can&#39;t buffer
+(large files, SSE, <code>res.pipe</code>): settlement runs first, the receipt header is
+set up-front, then the handler writes its own body — paid by construction.</li>
+</ul>
+<p>This mirrors <code>api/_lib/x402-paid-endpoint.js</code> on the platform. Runnable examples
+for both modes are in <a href="https://github.com/nirholas/x402-server/blob/main/examples"><code>examples/</code></a>.</p>
+<h3 id="buildchallengeoptions-body"><a class="anchor" href="#buildchallengeoptions-body" aria-label="Link to this section">#</a><code>buildChallenge(options) → Body</code></h3>
+<p>Build the v2 <code>402</code> envelope. Returns <code>{ x402Version, error, resource, accepts, extensions }</code>; the same object is what you base64 into the <code>PAYMENT-REQUIRED</code>
+header. Accepts the canonical accept shape:</p>
+<pre><code class="language-ts">{ scheme: &#39;exact&#39;, network, asset, payTo, amount, maxTimeoutSeconds,
+  extra: { name, decimals, feePayer? } }   // feePayer required on Solana
+</code></pre>
+<p>The Solana <code>feePayer</code> comes from the <code>feePayer</code> option, or from
+<code>X402_FEE_PAYER_SOLANA</code> in the environment when the option is omitted, so a
+deployment can keep the sponsor account out of its route code.</p>
+<h3 id="verifypayment-paymentheader-requirements-promiseverified"><a class="anchor" href="#verifypayment-paymentheader-requirements-promiseverified" aria-label="Link to this section">#</a><code>verifyPayment({ paymentHeader, requirements }) → Promise&lt;Verified&gt;</code></h3>
+<p>Decode the base64 <code>X-PAYMENT</code> header and verify it against <code>requirements</code> (your
+<code>accepts[]</code>) via the facilitator&#39;s <code>/verify</code>. Returns <code>{ ok, payer, accept }</code> on
+success, or <code>{ ok: false, body }</code> (a fresh <code>402</code> body) on a rejected/under-paid
+payment. <strong>Call your handler only when <code>ok</code>.</strong></p>
+<h3 id="settlepayment-verified-promisereceipt"><a class="anchor" href="#settlepayment-verified-promisereceipt" aria-label="Link to this section">#</a><code>settlePayment({ verified }) → Promise&lt;Receipt&gt;</code></h3>
+<p>Broadcast/settle the verified payment and return the receipt
+<code>{ network, payer, transaction }</code>. Run this <strong>after</strong> the work succeeds. The
+returned object is what you base64 into the <code>X-PAYMENT-RESPONSE</code> header.</p>
+<h3 id="feesplitpriceatomics-bps-recipient-net-fee-recipient-null"><a class="anchor" href="#feesplitpriceatomics-bps-recipient-net-fee-recipient-null" aria-label="Link to this section">#</a><code>feeSplit(priceAtomics, bps, recipient) → { net, fee, recipient } | null</code></h3>
+<p>Split a platform fee out of the listed price: <code>fee = floor(price × bps / 10_000)</code>, <code>net = price − fee</code>. Returns <code>null</code> when no fee applies (rate <code>0</code>, no
+recipient, or a sub-atomic fee) so the buyer is charged the full price and the
+creator receives all of it. <code>bps</code> is clamped to <code>[0, 1000]</code>.</p>
+<h2 id="how-it-works"><a class="anchor" href="#how-it-works" aria-label="Link to this section">#</a>How it works</h2>
+<pre><code>buyer request (no X-PAYMENT)
+        │
+        ▼
+   ┌──────────────┐  402  ┌──────────────────────────────────────────────┐
+   │ buildChallenge├──────▶ accepts[]:  Solana (exact, feePayer)          │
+   │              │       │             Base/EVM (EIP-3009 transferWith…) │
+   └──────────────┘       └──────────────────────────────────────────────┘
+        │ buyer signs (wallet) and retries with X-PAYMENT
+        ▼
+   verifyPayment ──▶ facilitator /verify ──▶ { ok, payer, accept }
+        │ ok
+        ▼
+   your handler runs the work  ◀── settlement has NOT happened yet
+        │ returns 200
+        ▼
+   settlePayment ──▶ on-chain settle ──▶ X-PAYMENT-RESPONSE receipt
+</code></pre>
+<p>The buyer never signs an instruction your server can&#39;t verify. On <strong>Solana</strong> the
+accept advertises a <code>feePayer</code> (the facilitator&#39;s sponsor account); the buyer&#39;s
+wallet signs an SPL <code>transferChecked</code> of the named mint to <code>payTo</code>, the
+facilitator co-signs as fee payer and lands it — the buyer pays no SOL gas. On
+<strong>Base/EVM</strong> the buyer signs an EIP-3009 <code>transferWithAuthorization</code> typed-data
+message locally (no on-chain tx, no gas) and the facilitator submits it;
+settlement is verified by scanning the mined tx for a USDC <code>Transfer</code> to <code>payTo</code>
+of at least the expected amount, with a confirmation floor against reorgs.</p>
+<h3 id="lanes"><a class="anchor" href="#lanes" aria-label="Link to this section">#</a>Lanes</h3>
+<table>
+<thead>
+<tr>
+<th>Lane</th>
+<th>Network id</th>
+<th>Scheme</th>
+<th>Buyer signs</th>
+<th>Gas</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Solana</strong></td>
+<td><code>solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp</code></td>
+<td><code>exact</code></td>
+<td>SPL <code>transferChecked</code> (facilitator co-signs)</td>
+<td>facilitator pays</td>
+</tr>
+<tr>
+<td><strong>Base</strong></td>
+<td><code>eip155:8453</code></td>
+<td><code>exact</code> (EIP-3009)</td>
+<td><code>transferWithAuthorization</code> typed data</td>
+<td>facilitator pays</td>
+</tr>
+<tr>
+<td>Base Sepolia</td>
+<td><code>eip155:84532</code></td>
+<td><code>exact</code> (EIP-3009)</td>
+<td>same</td>
+<td>facilitator pays</td>
+</tr>
+</tbody></table>
+<p>Solana leads the <code>accepts[]</code> so first-accept clients settle there; advertise
+<code>network: [&#39;base&#39;]</code> (or both) to lead with EVM. The challenge also carries a
+<code>bazaar</code> discovery extension so the endpoint is findable in the x402 bazaar.</p>
+<h2 id="payment"><a class="anchor" href="#payment" aria-label="Link to this section">#</a>Payment</h2>
+<p>Prices are quoted and charged in <strong>atomic units</strong> of the settlement asset — USDC
+is 6-decimal, so <code>1_000_000</code> = <code>$1.00</code>. The buyer&#39;s total is exactly <code>price</code>;
+the platform fee is carved <em>out</em> of it:</p>
+<table>
+<thead>
+<tr>
+<th><code>feeBps</code></th>
+<th>On a <code>$1.00</code> (<code>1000000</code>) call</th>
+<th>Creator nets</th>
+<th>Fee</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code> (default)</td>
+<td>buyer pays <code>$1.00</code></td>
+<td><code>$1.00</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>250</code> (2.5%)</td>
+<td>buyer pays <code>$1.00</code></td>
+<td><code>$0.975</code></td>
+<td><code>$0.025</code></td>
+</tr>
+<tr>
+<td><code>1000</code> (10%, max)</td>
+<td>buyer pays <code>$1.00</code></td>
+<td><code>$0.90</code></td>
+<td><code>$0.10</code></td>
+</tr>
+</tbody></table>
+<p>The fee applies <strong>only</strong> when both <code>feeBps &gt; 0</code> <strong>and</strong> <code>feeTo</code> is set, so an
+unconfigured server charges nothing — the fee feature ships inert and never
+surprise-bills on deploy. On Solana the fee is an extra <code>transferChecked</code> in the
+<em>same</em> transaction the buyer signs (one signature, no custody, atomic); the
+buyer sees and signs it. The only coin this platform promotes is
+<a href="https://three.ws">$THREE</a> — settlement runs in USDC, and any mint your server
+names is supplied by you at config time.</p>
+<h2 id="errors-edge-cases"><a class="anchor" href="#errors-edge-cases" aria-label="Link to this section">#</a>Errors &amp; edge cases</h2>
+<p><code>verifyPayment</code> returns a structured result rather than throwing on a bad
+payment, and <code>paid()</code> maps every state to the right HTTP status:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>HTTP</th>
+<th>Meaning</th>
+<th>What the buyer sees / does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>payment_required</code></td>
+<td>402</td>
+<td>No <code>X-PAYMENT</code>, or the header failed <code>/verify</code>.</td>
+<td>A fresh challenge — pay and retry.</td>
+</tr>
+<tr>
+<td><code>invalid_payment</code></td>
+<td>402</td>
+<td>The signed tx doesn&#39;t pay the declared amount/asset/recipient.</td>
+<td>Re-sign against the advertised accept.</td>
+</tr>
+<tr>
+<td><code>missing_fee_payer</code></td>
+<td>422</td>
+<td>A Solana accept omitted <code>extra.feePayer</code>.</td>
+<td>Server misconfig — set <code>X402_FEE_PAYER_SOLANA</code>.</td>
+</tr>
+<tr>
+<td><code>unsupported_network</code></td>
+<td>400</td>
+<td>Buyer paid a network the route doesn&#39;t advertise.</td>
+<td>Pick an advertised accept.</td>
+</tr>
+<tr>
+<td><code>facilitator_unreachable</code></td>
+<td>502</td>
+<td>The facilitator <code>/verify</code> or <code>/settle</code> is down.</td>
+<td><strong>No funds moved</strong> — safe to retry.</td>
+</tr>
+<tr>
+<td><code>settle_uncertain</code></td>
+<td>502</td>
+<td>Verified + work ran, but settlement status is unknown.</td>
+<td>Check on-chain before retrying to avoid double-pay.</td>
+</tr>
+<tr>
+<td><code>pending</code></td>
+<td>—</td>
+<td>EVM tx not yet mined / below the confirmation floor.</td>
+<td>Confirm again shortly.</td>
+</tr>
+</tbody></table>
+<p>Two invariants make these safe: verification runs <strong>before</strong> your handler (a bad
+payment never triggers the work), and settlement runs <strong>after</strong> it (a failed
+handler never charges). A <code>429</code> from your upstream can be retried with the
+<em>same</em> signed payment, because settlement only happens once the work succeeds.</p>
+<h2 id="examples"><a class="anchor" href="#examples" aria-label="Link to this section">#</a>Examples</h2>
+<p>Runnable versions of everything below live in <a href="https://github.com/nirholas/x402-server/blob/main/examples"><code>examples/</code></a> — start
+with <a href="https://github.com/nirholas/x402-server/blob/main/examples/loopback-demo.mjs"><code>examples/loopback-demo.mjs</code></a>, which runs the
+whole buyer↔seller loop offline against a local stub facilitator
+(<code>node examples/loopback-demo.mjs</code>). A step-by-step walkthrough is in the
+<a href="https://three.ws/tutorials/x402-server-sdk">x402-server SDK tutorial</a>.</p>
+<p><strong>Express — meter an existing API</strong></p>
+<pre><code class="language-js">import express from &#39;express&#39;;
+import { paid } from &#39;@three-ws/x402-server&#39;;
+
+const app = express();
+app.use(express.json());
+
+app.post(&#39;/v1/embed&#39;, paid(
+  { price: &#39;2000&#39;, asset: &#39;usdc&#39;, payTo: { solana: &#39;THREEsynthetic1111…&#39; } },
+  async (req, res) =&gt; res.json({ vector: await embed(req.body.text) }),
+));
+
+app.listen(3000);
+</code></pre>
+<p><strong>Vercel / Node <code>http</code> — a paid serverless function</strong></p>
+<pre><code class="language-js">import { paid } from &#39;@three-ws/x402-server&#39;;
+
+export default paid(
+  { price: &#39;100000&#39;, asset: &#39;usdc&#39;, payTo: { base: &#39;0xPayout…&#39; }, network: [&#39;base&#39;] },
+  async (req, res, payment) =&gt; {
+    res.json({ report: await generate(req.body.topic), billedTo: payment.payer });
+  },
+);
+</code></pre>
+<p><strong>Agent economy — sell a tool, record every call</strong></p>
+<pre><code class="language-js">export default paid(
+  {
+    price: &#39;5000&#39;, asset: &#39;usdc&#39;,
+    payTo: { solana: &#39;THREEsynthetic1111…&#39; },
+    serviceName: &#39;Pose seeds&#39;, tags: [&#39;3d&#39;, &#39;animation&#39;],
+    onSettled: (receipt) =&gt; recordCall(receipt),   // feed your dashboard / webhook
+  },
+  async (req, res) =&gt; res.json({ seed: await poseSeed(req.body.prompt) }),
+);
+</code></pre>
+<p>A buyer running <a href="https://www.npmjs.com/package/@three-ws/x402-fetch"><code>@three-ws/x402-fetch</code></a>
+calls any of these with a plain <code>fetch</code> — the <code>402</code> is paid automatically and the
+result comes back as if the endpoint were free.</p>
+<h2 id="related"><a class="anchor" href="#related" aria-label="Link to this section">#</a>Related</h2>
+<ul>
+<li><a href="https://www.npmjs.com/package/@three-ws/x402-fetch"><code>@three-ws/x402-fetch</code></a> — <strong>buyer side.</strong> A <code>fetch</code> wrapper that auto-pays the <code>402</code> your server here emits.</li>
+<li><a href="https://www.npmjs.com/package/@three-ws/x402-modal"><code>@three-ws/x402-modal</code></a> — <strong>buyer side.</strong> A drop-in browser checkout modal for the same <code>402</code>.</li>
+<li><a href="https://www.npmjs.com/package/@three-ws/forge"><code>@three-ws/forge</code></a> — a real paid endpoint built on these rails (text/image → 3D GLB).</li>
+<li><a href="https://three.ws">three.ws merchant console</a> — hosted SKUs, storefronts, and settlement dashboards over the same primitives.</li>
+</ul>
+<hr>
+<p align="center">Built by <a href="https://three.ws">three.ws</a> · The only coin is <a href="https://three.ws">$THREE</a></p>
+</main>
+<nav class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#why">Why</a></li><li><a href="#install">Install</a></li><li><a href="#quick-start">Quick start</a></li><li><a href="#api">API</a></li><li><a href="#how-it-works">How it works</a></li><li><a href="#payment">Payment</a></li><li><a href="#errors-edge-cases">Errors &amp; edge cases</a></li><li><a href="#examples">Examples</a></li><li><a href="#related">Related</a></li></ul></nav>
+</div>
+<footer><div class="foot-in"><span>Apache-2.0 licensed</span><a href="https://github.com/nirholas/x402-server/issues">Issues</a><a href="https://github.com/nirholas/x402-server/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/nirholas/x402-server/security/policy">Security</a><a href="https://three.ws">Part of three.ws</a></div></footer>
+<script>document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){
+var t=b.getAttribute('data-copy');var done=function(){var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o},1400)};
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){})}
+else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');done()}catch(e){}a.remove()}})});</script>
+</body>
+</html>
