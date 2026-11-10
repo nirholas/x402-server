@@ -1,0 +1,22 @@
+{
+  "name": "x402-server",
+  "owner": {
+    "name": "nirholas"
+  },
+  "description": "Merchant-side x402 library: 402 challenges, payment verification and settlement, and fee splits.",
+  "plugins": [
+    {
+      "name": "x402-merchant-sdk",
+      "source": "./plugins/x402-merchant-sdk",
+      "description": "Turn an HTTP endpoint into a paid x402 one: issue 402 challenges, verify and settle payments on Solana, and split a platform fee.",
+      "category": "development",
+      "tags": [
+        "x402",
+        "payments",
+        "merchant",
+        "solana",
+        "paywall"
+      ]
+    }
+  ]
+}
